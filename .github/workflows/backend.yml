@@ -1,0 +1,37 @@
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: personalized_learning
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d personalized_learning"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e "./backend[dev]"
+      - run: ruff check backend
+      - run: pytest backend/tests
+      - run: alembic -c backend/alembic.ini upgrade head
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/personalized_learning
+      - run: python -c "from app.main import app; assert app.openapi()['info']['title'] == 'Prism API'" 
+        working-directory: backend
