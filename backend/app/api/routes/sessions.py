@@ -11,6 +11,7 @@ from app.core.errors import ApiError
 from app.db.session import get_db
 from app.models.models import Assignment, GeneratedAssignment, Profile, SandboxSession, SandboxSessionStatus, Submission
 from app.schemas.sessions import HintRequest, ProgressRequest, SubmitRequest
+from app.services.sandbox import automatic_step_ids, build_progressive_hint
 
 router = APIRouter(tags=["sessions"])
 
@@ -42,11 +43,12 @@ def update_progress(session_id: uuid.UUID, data: ProgressRequest, db: Annotated[
     valid_variables = {variable["id"]: variable for variable in spec.get("variables", [])}
     if not set(data.completed_step_ids).issubset(valid_steps):
         raise ApiError(422, "INVALID_STEP_ID", "Completed steps must be in the sandbox specification.")
+    completed_step_ids = sorted(set(data.completed_step_ids) | automatic_step_ids(spec, data.responses))
     for key, value in data.responses.items():
         variable = valid_variables.get(key)
         if variable is None or not isinstance(value, (int, float)) or not variable["min"] <= value <= variable["max"]:
             raise ApiError(422, "INVALID_RESPONSE", "Responses must match configured variable ranges.")
-    result = db.execute(update(SandboxSession).where(SandboxSession.id == item.id, SandboxSession.version == data.expected_version).values(completed_step_ids=data.completed_step_ids, responses=data.responses, progress={"completed_step_ids": data.completed_step_ids, "responses": data.responses}, version=SandboxSession.version + 1))
+    result = db.execute(update(SandboxSession).where(SandboxSession.id == item.id, SandboxSession.version == data.expected_version).values(completed_step_ids=completed_step_ids, responses=data.responses, progress={"completed_step_ids": completed_step_ids, "responses": data.responses}, version=SandboxSession.version + 1))
     if result.rowcount != 1:
         db.rollback()
         raise ApiError(409, "SESSION_VERSION_CONFLICT", "The sandbox session was updated by another request.")
@@ -63,8 +65,7 @@ def hint(session_id: uuid.UUID, data: HintRequest, db: Annotated[Session, Depend
     item.hints_used += 1
     db.commit()
     db.refresh(item)
-    step = data.current_step_id or "the next guided step"
-    return {"hint_level": item.hints_used, "hint": f"Focus on the relationship between mass and acceleration while working on {step}.", "remaining_hint_levels": 3 - item.hints_used}
+    return {"hint_level": item.hints_used, "hint": build_progressive_hint(generated.sandbox_spec or {}, item.responses, item.completed_step_ids, item.hints_used, data.current_step_id), "remaining_hint_levels": 3 - item.hints_used}
 
 
 @router.post("/sandbox-sessions/{session_id}/submit", status_code=status.HTTP_201_CREATED)

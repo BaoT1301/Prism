@@ -528,6 +528,10 @@ data: {"code":"AI_PROVIDER_ERROR","message":"..."}
 
 The non-streaming hint endpoint is the required fallback.
 
+Hints should be progressive and state-aware. The backend may use the current step,
+session responses, completed steps, and hint level to return a different safe hint
+for each request. Hints must not reveal the final answer immediately.
+
 ## 10. Submission
 
 ### POST `/sandbox-sessions/{session_id}/submit`
@@ -589,6 +593,15 @@ Response:
 ```
 
 Do not expose private AI chat transcripts.
+
+### Sandbox completion checks
+
+`parameter_explorer` guided steps may include explicit machine-readable
+`completion_checks`. Supported checks are `value_changed`, `value_increased`,
+`value_decreased`, and `reflection_answered`. The renderer evaluates these checks
+deterministically and automatically includes satisfied step IDs in progress updates.
+The backend also recognizes value checks when saving progress. Natural-language
+instructions must not be parsed to infer completion.
 
 ## 11. Health endpoints
 
