@@ -36,7 +36,7 @@
     {
       "id": "step-2",
       "instruction": "Increase acceleration and observe how the force changes.",
-      "completion_checks": [{ "type": "value_increased", "variable_id": "acceleration" }]
+      "completion_checks": [{ "type": "value_changed", "variable_id": "acceleration" }]
     },
     {
       "id": "step-3",
