@@ -10,6 +10,7 @@ from app.schemas.personalization import GeneratedContent
 from app.schemas.sessions import HintRequest, ProgressRequest, SubmitRequest
 from app.services.domain import DomainService
 from app.services.personalization import FixturePersonalizationProvider, PersonalizationService
+from app.services.sandbox import automatic_step_ids, build_progressive_hint
 
 
 @pytest.fixture
@@ -111,3 +112,18 @@ def test_progress_hints_and_idempotent_submission(domain_db):
     first = submit(session.id, SubmitRequest(expected_session_version=2), db, student)
     second = submit(session.id, SubmitRequest(expected_session_version=2), db, student)
     assert first["id"] == second["id"]
+
+
+def test_completion_checks_and_progressive_hints(domain_db):
+    db, teacher, student, _, _ = domain_db
+    domain = DomainService()
+    classroom = domain.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
+    domain.join_class(db, student, classroom.join_code)
+    assignment = domain.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Force", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type="parameter_explorer"))
+    domain.publish_assignment(db, assignment.id, teacher)
+    interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
+    generated, _, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
+    spec = generated.sandbox_spec
+    assert automatic_step_ids(spec, {"mass": 2, "acceleration": 5}) == {"set-mass"}
+    hints = [build_progressive_hint(spec, {"mass": 2, "acceleration": 5}, [], level, "set-mass") for level in (1, 2, 3)]
+    assert len(set(hints)) == 3

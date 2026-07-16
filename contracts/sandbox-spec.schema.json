@@ -23,6 +23,14 @@
         "parameter_explorer"
       ]
     },
+    "visual_theme": {
+      "enum": [
+        "basketball",
+        "formula1",
+        "space"
+      ],
+      "default": "basketball"
+    },
     "title": {
       "type": "string",
       "minLength": 1,
@@ -108,6 +116,41 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 400
+          },
+          "completion_checks": {
+            "type": "array",
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "type"
+              ],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "value_changed",
+                    "value_increased",
+                    "value_decreased",
+                    "reflection_answered"
+                  ]
+                },
+                "variable_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[a-z][a-z0-9_]{0,39}$"
+                },
+                "question_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "pattern": "^[a-z][a-z0-9_-]{0,39}$"
+                }
+              }
+            }
           }
         }
       }

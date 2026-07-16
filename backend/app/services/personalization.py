@@ -35,17 +35,29 @@ class FixturePersonalizationProvider:
             instructions=["Set a mass.", "Set an acceleration.", "Compare the resulting force."],
             reflection_questions=["How did changing acceleration affect force?"],
             sandbox_spec={
-                "version": 1, "sandbox_type": "parameter_explorer", "title": f"{theme.title()} Force Lab",
+                "version": 1, "sandbox_type": "parameter_explorer", "visual_theme": self._theme(theme), "title": f"{theme.title()} Force Lab",
                 "introduction": f"Use this {theme} scenario to explore force.", "formula_id": "force_equals_mass_times_acceleration",
                 "variables": [
                     {"id": "mass", "label": "Mass", "unit": "kg", "min": 0.1, "max": 10, "step": 0.1, "default": 1, "editable": True},
                     {"id": "acceleration", "label": "Acceleration", "unit": "m/s²", "min": 0, "max": 20, "step": 1, "default": 5, "editable": True},
                 ],
-                "guided_steps": [{"id": "set-mass", "instruction": "Set a mass."}, {"id": "set-acceleration", "instruction": "Set an acceleration."}],
+                "guided_steps": [
+                    {"id": "set-mass", "instruction": "Change the mass and observe how force changes.", "completion_checks": [{"type": "value_changed", "variable_id": "mass"}]},
+                    {"id": "set-acceleration", "instruction": "Increase acceleration and observe how force changes.", "completion_checks": [{"type": "value_increased", "variable_id": "acceleration"}]},
+                ],
                 "completion_rules": [{"type": "all_steps_completed"}],
                 "reflection_questions": [{"id": "reflection-1", "question": "How did changing acceleration affect force?"}],
             },
         )
+
+    @staticmethod
+    def _theme(theme: str) -> str:
+        normalized = theme.casefold()
+        if "formula" in normalized or "racing" in normalized:
+            return "formula1"
+        if "space" in normalized or "rocket" in normalized:
+            return "space"
+        return "basketball"
 
 
 class OpenAIPersonalizationProvider:

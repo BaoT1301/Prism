@@ -1,6 +1,7 @@
 {
   "version": 1,
   "sandbox_type": "parameter_explorer",
+  "visual_theme": "basketball",
   "title": "Basketball Force Lab",
   "introduction": "Explore how the mass and acceleration of a basketball affect the force required for a pass.",
   "formula_id": "force_equals_mass_times_acceleration",
@@ -29,15 +30,18 @@
   "guided_steps": [
     {
       "id": "step-1",
-      "instruction": "Keep acceleration at 8 m/s^2 and compare the force for two different basketball masses."
+      "instruction": "Change the basketball mass and observe how the force changes.",
+      "completion_checks": [{ "type": "value_changed", "variable_id": "mass" }]
     },
     {
       "id": "step-2",
-      "instruction": "Keep mass at 0.6 kg and increase acceleration. Observe how force changes."
+      "instruction": "Increase acceleration and observe how the force changes.",
+      "completion_checks": [{ "type": "value_increased", "variable_id": "acceleration" }]
     },
     {
       "id": "step-3",
-      "instruction": "Explain the relationship among mass, acceleration, and force."
+      "instruction": "Explain the relationship among mass, acceleration, and force.",
+      "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }]
     }
   ],
   "completion_rules": [
