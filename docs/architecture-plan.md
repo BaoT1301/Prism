@@ -15,19 +15,16 @@
 
 ### Frontend
 
-- Next.js
+- React 19
 - TypeScript
-- App Router
-- Tailwind CSS
-- shadcn/ui
-- TanStack Query
-- React Hook Form
-- Zod
-- Recharts
-- KaTeX
-- Playwright
+- Vite 6
+- Vitest
+- Browser end-to-end testing before release
 
-Frontend owners may adjust component libraries, but the backend contract must remain independent of presentation choices.
+The committed frontend is a Vite application, not Next.js. Frontend owners may add
+small presentation or form libraries when needed, but must not replace the build
+tool or create a second frontend application without an agreed migration. The backend
+contract remains independent of presentation choices.
 
 ### Backend
 
@@ -96,7 +93,7 @@ Do not add Redis or a worker queue unless measured generation latency makes the 
 ## 4. High-level architecture
 
 ```text
-Browser / Next.js
+Browser / React + Vite
     |
     | Supabase login and session
     | Authorization: Bearer <access token>
@@ -194,7 +191,8 @@ Tests and demo fallback must not require a live model call.
 â”œâ”€â”€ AGENTS.md
 â”œâ”€â”€ README.md
 â”œâ”€â”€ docs/
-â”œâ”€â”€ codex-tasks/
+â”œâ”€â”€ docs/team-handoffs/
+â”‚   â””â”€â”€ role-specific implementation guidance
 â”œâ”€â”€ contracts/
 â”‚   â””â”€â”€ sandbox-spec.schema.json
 â”œâ”€â”€ backend/
@@ -245,9 +243,9 @@ DEMO_MODE
 Frontend-owned variables may include:
 
 ```text
-NEXT_PUBLIC_SUPABASE_URL
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
-NEXT_PUBLIC_API_BASE_URL
+VITE_SUPABASE_URL
+VITE_SUPABASE_PUBLISHABLE_KEY
+VITE_API_BASE_URL
 ```
 
 Do not put a Supabase secret/service key in the browser.
@@ -425,13 +423,15 @@ Own teacher pages and API integration using mocks before endpoints are ready.
 
 Own student onboarding, join flow, dashboard, assignment launch, and submission confirmation.
 
-### Person 4 â€” AI personalization
+### Person 4 â€” sandbox
 
-Own prompt library, structured-output behavior, safety, hint behavior, evaluation cases, and provider implementation behind the agreed interface.
+Own the schema-driven renderer, formula registry, interaction state, guided steps,
+completion logic, and hint presentation.
 
-### Person 5 â€” sandbox
+### Person 5 â€” AI personalization
 
-Own schema-driven renderer, formula registry, interaction state, guided steps, completion logic, and hint presentation.
+Own the prompt library, structured-output behavior, safety, hint behavior,
+evaluation cases, and provider implementation behind the agreed interface.
 
 ### Person 6 â€” integration/quality/demo
 
@@ -441,10 +441,13 @@ Own deployed smoke tests, generated frontend types, environment coordination, CI
 
 ### Local
 
-`docker-compose.yml` should provide:
+`docker-compose.yml` provides:
 
 - PostgreSQL
 - FastAPI
+
+Run the Vite frontend separately with `npm run dev` (default origin
+`http://localhost:5173`).
 
 Use hosted Supabase for true auth integration, or fake auth dependencies in tests.
 

@@ -19,7 +19,7 @@ services:
       context: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/personalized_learning
-      FRONTEND_URL: http://localhost:3000
+      FRONTEND_URL: http://localhost:5173
       ENVIRONMENT: development
     ports:
       - "8000:8000"

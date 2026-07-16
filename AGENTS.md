@@ -8,9 +8,12 @@ Before changing code, read:
 - `docs/architecture-plan.md`
 - `docs/api-contracts.md`
 - `docs/database-schema.md`
-- The current task file under `codex-tasks/`
+- The applicable role handoff under `docs/team-handoffs/`
 
 Treat those documents as the source of truth. If code and documentation disagree, report the conflict before silently changing the contract.
+
+`codex-tasks/` was retired after the foundation build. The role handoffs are the
+current work queue and ownership reference.
 
 ## Project goal
 

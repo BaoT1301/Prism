@@ -11,11 +11,10 @@ editing code.
 
 ## First tasks
 
-1. Commit and push the existing backend work after reviewing the diff.
-2. Apply backend/alembic to Supabase Postgres using the configured connection.
-3. Test a real Supabase access token against /api/v1/me and profile bootstrap.
-4. Deploy a staging FastAPI service, set FRONTEND_URL, and publish Swagger URL.
-5. Run a protected live OpenAI smoke test.
+1. Apply backend/alembic to Supabase Postgres using the configured connection.
+2. Test a real Supabase access token against /api/v1/me and profile bootstrap.
+3. Deploy a staging FastAPI service, set FRONTEND_URL, and publish Swagger URL.
+4. Run a protected live OpenAI smoke test.
 
 ## Known implementation details
 

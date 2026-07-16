@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = Field(default=None, repr=False)
     openai_model: str = "gpt-5.6"
     openai_moderation_model: str = "omni-moderation-latest"
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = "http://localhost:5173"
     demo_mode: bool = False
 
     @field_validator("environment")
