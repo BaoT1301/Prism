@@ -1,12 +1,27 @@
+import uuid
+from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.models.models import SandboxSessionStatus
+
+
+class ReflectionAnswer(BaseModel):
+    question_id: str = Field(min_length=1, max_length=40)
+    answer: str = Field(max_length=2000)
+
+    @field_validator("answer")
+    @classmethod
+    def normalize_answer(cls, value: str) -> str:
+        return value.strip()
 
 
 class ProgressRequest(BaseModel):
     expected_version: int = Field(ge=1)
     completed_step_ids: list[str] = Field(max_length=8)
     responses: dict[str, Any] = Field(default_factory=dict)
+    reflection_answers: list[ReflectionAnswer] = Field(default_factory=list, max_length=5)
 
 
 class HintRequest(BaseModel):
@@ -16,4 +31,42 @@ class HintRequest(BaseModel):
 
 class SubmitRequest(BaseModel):
     expected_session_version: int = Field(ge=1)
-    reflection_answers: list[dict[str, str]] = Field(default_factory=list, max_length=5)
+    reflection_answers: list[ReflectionAnswer] = Field(default_factory=list, max_length=5)
+
+
+class SandboxSessionResponse(BaseModel):
+    id: uuid.UUID
+    version: int = Field(ge=1)
+    status: SandboxSessionStatus
+    completed_step_ids: list[str]
+    responses: dict[str, Any]
+    reflection_answers: list[ReflectionAnswer]
+    hints_used: int = Field(ge=0)
+    updated_at: datetime
+
+
+class HintResponse(BaseModel):
+    hint_level: int = Field(ge=1, le=3)
+    hint: str
+    remaining_hint_levels: int = Field(ge=0, le=3)
+
+
+class SubmissionResponse(BaseModel):
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    student_id: uuid.UUID
+    status: str
+    submitted_at: datetime
+
+
+class SubmissionSummaryResponse(BaseModel):
+    submission_id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    status: str
+    submitted_at: datetime | None
+
+
+class SubmissionListResponse(BaseModel):
+    items: list[SubmissionSummaryResponse]
+    total: int = Field(ge=0)

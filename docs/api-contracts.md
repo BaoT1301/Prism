@@ -364,12 +364,6 @@ Idempotent if already published.
 
 Student class member only.
 
-Optional header:
-
-```text
-Idempotency-Key: <uuid>
-```
-
 Request body may be empty.
 
 Response `200`:
@@ -390,7 +384,10 @@ Response `200`:
       "Observe the force."
     ],
     "reflection_questions": [
-      "What happened to force when acceleration increased?"
+      {
+        "id": "reflection-1",
+        "question": "What happened to force when acceleration increased?"
+      }
     ],
     "sandbox_spec": {},
     "generated_at": "2026-07-15T21:00:00Z"
@@ -398,11 +395,13 @@ Response `200`:
   "cache_status": "hit",
   "session": {
     "id": "fbd69376-fc1b-478f-a650-b91bf697a655",
+    "version": 1,
     "status": "in_progress",
-    "progress": {
-      "completed_step_ids": [],
-      "responses": {}
-    }
+    "completed_step_ids": [],
+    "responses": {},
+    "reflection_answers": [],
+    "hints_used": 0,
+    "updated_at": "2026-07-15T21:00:00Z"
   }
 }
 ```
@@ -448,7 +447,13 @@ Request:
   "responses": {
     "mass": 0.6,
     "acceleration": 8
-  }
+  },
+  "reflection_answers": [
+    {
+      "question_id": "reflection-1",
+      "answer": "Force increases when acceleration increases."
+    }
+  ]
 }
 ```
 
@@ -464,6 +469,12 @@ Response:
     "mass": 0.6,
     "acceleration": 8
   },
+  "reflection_answers": [
+    {
+      "question_id": "reflection-1",
+      "answer": "Force increases when acceleration increases."
+    }
+  ],
   "hints_used": 0,
   "updated_at": "2026-07-15T21:05:00Z"
 }
@@ -600,8 +611,15 @@ Do not expose private AI chat transcripts.
 `completion_checks`. Supported checks are `value_changed`, `value_increased`,
 `value_decreased`, and `reflection_answered`. The renderer evaluates these checks
 deterministically and automatically includes satisfied step IDs in progress updates.
-The backend also recognizes value checks when saving progress. Natural-language
-instructions must not be parsed to infer completion.
+The backend validates reflection question IDs and re-evaluates value and reflection
+checks when saving progress. Natural-language instructions must not be parsed to infer
+completion.
+
+`completion_rules` declare when the UI may enable submission: `all_steps_completed`
+requires every guided step; `step_completed` requires its `step_id`; and
+`reflection_answered` requires non-empty answers for every reflection question in the
+sandbox specification. Server-side submission enforcement is part of the backend
+correctness phase and must use these same semantics.
 
 ## 11. Health endpoints
 

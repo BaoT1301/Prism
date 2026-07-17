@@ -10,6 +10,8 @@ from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.db.session import get_db
 from app.models.models import Assignment, AssignmentStatus, ClassMember, InterestProfile, Profile
+from app.schemas.personalization import StartResponse
+from app.schemas.sessions import SandboxSessionResponse
 from app.services.personalization import FixturePersonalizationProvider, OpenAIPersonalizationProvider, PersonalizationService
 
 router = APIRouter(tags=["personalization"])
@@ -21,7 +23,7 @@ def get_service() -> PersonalizationService:
     return PersonalizationService(provider)
 
 
-@router.post("/assignments/{assignment_id}/start")
+@router.post("/assignments/{assignment_id}/start", response_model=StartResponse)
 def start_assignment(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)], service: Annotated[PersonalizationService, Depends(get_service)]):
     assignment = db.get(Assignment, assignment_id)
     if assignment is None:
@@ -34,4 +36,14 @@ def start_assignment(assignment_id: uuid.UUID, db: Annotated[Session, Depends(ge
     if interests is None:
         raise ApiError(409, "INTEREST_PROFILE_REQUIRED", "An interest profile is required.")
     generated, session, cache_status = service.start(db, assignment, student, interests)
-    return {"generated_assignment": {"id": generated.id, "assignment_id": generated.assignment_id, "student_id": generated.student_id, "personalized_title": generated.personalized_title, "scenario": generated.scenario, "problem_statement": generated.problem_statement, "learning_objective": generated.learning_objective, "instructions": generated.instructions, "reflection_questions": generated.reflection_questions, "sandbox_spec": generated.sandbox_spec, "generated_at": generated.completed_at or generated.created_at}, "cache_status": cache_status, "session": {"id": session.id, "status": session.status, "progress": {"completed_step_ids": session.completed_step_ids, "responses": session.responses}}}
+    session_payload = SandboxSessionResponse.model_validate({
+        "id": session.id,
+        "version": session.version,
+        "status": session.status,
+        "completed_step_ids": session.completed_step_ids,
+        "responses": session.responses,
+        "reflection_answers": session.progress.get("reflection_answers", []),
+        "hints_used": session.hints_used,
+        "updated_at": session.updated_at,
+    })
+    return {"generated_assignment": {"id": generated.id, "assignment_id": generated.assignment_id, "student_id": generated.student_id, "personalized_title": generated.personalized_title, "scenario": generated.scenario, "problem_statement": generated.problem_statement, "learning_objective": generated.learning_objective, "instructions": generated.instructions, "reflection_questions": generated.reflection_questions, "sandbox_spec": generated.sandbox_spec, "generated_at": generated.completed_at or generated.created_at}, "cache_status": cache_status, "session": session_payload}

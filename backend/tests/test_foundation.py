@@ -1,11 +1,15 @@
+import json
 import uuid
+from pathlib import Path
 
 import pytest
 from fastapi import HTTPException
+from jsonschema import Draft202012Validator
 from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies.auth import get_student, get_teacher
 from app.models.models import Class, Profile, UserRole
+from app.schemas.personalization import GeneratedContent
 
 
 def auth(token: str = "valid") -> dict[str, str]:
@@ -22,7 +26,21 @@ def test_health_success(client):
 def test_openapi_generation(client):
     response = client[0].get("/openapi.json")
     assert response.status_code == 200
-    assert "/api/v1/me" in response.json()["paths"]
+    document = response.json()
+    assert "/api/v1/me" in document["paths"]
+    class_schema = document["components"]["schemas"]["ClassResponse"]
+    assert {"student_count", "assignment_count"}.issubset(class_schema["properties"])
+    session_schema = document["components"]["schemas"]["SandboxSessionResponse"]
+    assert "reflection_answers" in session_schema["properties"]
+
+
+def test_generated_assignment_example_matches_the_persisted_contract():
+    root = Path(__file__).parents[2]
+    example = json.loads((root / "contracts" / "examples" / "generated-assignment-basketball.json").read_text(encoding="utf-8"))
+    schema = json.loads((root / "contracts" / "sandbox-spec.schema.json").read_text(encoding="utf-8"))
+    generated = GeneratedContent.model_validate(example)
+    Draft202012Validator(schema).validate(generated.sandbox_spec)
+    assert [question.model_dump() for question in generated.reflection_questions] == generated.sandbox_spec["reflection_questions"]
 
 
 def test_missing_token(client):
@@ -61,6 +79,21 @@ def test_duplicate_bootstrap_is_idempotent_and_role_conflict(client):
     response = test_client.post("/api/v1/profiles/bootstrap", headers=auth(), json={"display_name": "Bao", "role": "teacher"})
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "PROFILE_ALREADY_EXISTS"
+
+
+def test_class_contract_includes_live_counts(client):
+    test_client, _ = client
+    assert test_client.post("/api/v1/profiles/bootstrap", headers=auth(), json={"display_name": "Bao", "role": "teacher"}).status_code == 201
+    created = test_client.post("/api/v1/classes", headers=auth(), json={"name": "Physics", "subject": "Physics", "grade_level": "10"})
+    assert created.status_code == 201
+    classroom = created.json()
+    assert classroom["student_count"] == 0
+    assert classroom["assignment_count"] == 0
+    assignment = test_client.post(f"/api/v1/classes/{classroom['id']}/assignments", headers=auth(), json={"title": "Force", "topic": "Forces", "learning_objective": "Apply F = ma.", "grade_level": "10", "sandbox_type": "parameter_explorer"})
+    assert assignment.status_code == 201
+    listed = test_client.get("/api/v1/classes", headers=auth())
+    assert listed.status_code == 200
+    assert listed.json()["items"][0]["assignment_count"] == 1
 
 
 def test_role_dependencies():

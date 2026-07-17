@@ -38,8 +38,7 @@ export function createSandboxApi(baseUrl = "", getAccessToken?: () => Promise<st
     startAssignment: async (assignmentId) => request(baseUrl, `/api/v1/assignments/${assignmentId}/start`, { method: "POST", headers: await authHeaders() }),
     launchAssignment: async (assignmentId) => {
       const started = await request<StartAssignmentResponse>(baseUrl, `/api/v1/assignments/${assignmentId}/start`, { method: "POST", headers: await authHeaders() });
-      const session = await request<SandboxSession>(baseUrl, `/api/v1/sandbox-sessions/${started.session.id}`, { headers: await authHeaders() });
-      return { assignment: started.generated_assignment, session, cache_status: started.cache_status };
+      return { assignment: started.generated_assignment, session: started.session, cache_status: started.cache_status };
     },
     getSession: async (sessionId) => request(baseUrl, `/api/v1/sandbox-sessions/${sessionId}`, { headers: await authHeaders() }),
     updateProgress: async (sessionId, body) => request(baseUrl, `/api/v1/sandbox-sessions/${sessionId}/progress`, { method: "PATCH", headers: await authHeaders(), body: JSON.stringify(body) }),

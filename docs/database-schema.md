@@ -281,6 +281,10 @@ Indexes:
 - `(student_id, updated_at DESC)`
 
 Use optimistic concurrency by updating where `version = expected_version`, then incrementing version.
+`progress` stores the latest completed step IDs, variable responses, and typed
+reflection answers so a student can safely resume an unfinished sandbox. The dedicated
+`responses` and `completed_step_ids` columns remain the queryable copies of the first
+two values; the submission persists the final reflection-answer snapshot separately.
 
 ### `submissions`
 

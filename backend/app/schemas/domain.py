@@ -1,5 +1,10 @@
 
-from pydantic import BaseModel, Field, field_validator
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.models.models import AssignmentStatus
 
 
 class ClassCreate(BaseModel):
@@ -53,3 +58,76 @@ class InterestsRequest(BaseModel):
             seen.add(normalized.casefold())
             result.append(normalized)
         return result
+
+
+class ClassResponse(BaseModel):
+    id: uuid.UUID
+    teacher_id: uuid.UUID
+    name: str
+    subject: str
+    grade_level: str
+    description: str | None
+    join_code: str
+    student_count: int = Field(ge=0)
+    assignment_count: int = Field(ge=0)
+    created_at: datetime
+
+
+class ClassListResponse(BaseModel):
+    items: list[ClassResponse]
+    total: int = Field(ge=0)
+
+
+class ClassMembershipResponse(BaseModel):
+    class_id: uuid.UUID
+    student_id: uuid.UUID
+    joined_at: datetime
+
+
+class ClassMemberResponse(BaseModel):
+    student_id: uuid.UUID
+    display_name: str
+    joined_at: datetime
+
+
+class ClassMemberListResponse(BaseModel):
+    items: list[ClassMemberResponse]
+    total: int = Field(ge=0)
+
+
+class AssignmentResponse(BaseModel):
+    id: uuid.UUID
+    class_id: uuid.UUID
+    teacher_id: uuid.UUID
+    title: str
+    topic: str
+    learning_objective: str
+    grade_level: str
+    instructions: str | None
+    sandbox_type: str
+    status: AssignmentStatus
+    content_version: int = Field(ge=1)
+    published_at: datetime | None
+    created_at: datetime
+
+
+class AssignmentListResponse(BaseModel):
+    items: list[AssignmentResponse]
+    total: int = Field(ge=0)
+
+
+class InterestProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    student_id: uuid.UUID
+    version: int = Field(ge=1)
+    sports: list[str]
+    games: list[str]
+    movies: list[str]
+    hobbies: list[str]
+    career_interests: list[str]
+    favorite_animals: list[str]
+    favorite_subjects: list[str]
+    additional_interests: list[str]
+    updated_at: datetime

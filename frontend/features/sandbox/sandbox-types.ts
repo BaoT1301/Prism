@@ -61,6 +61,7 @@ export interface SandboxSession {
   status: "in_progress" | "completed" | "submitted";
   completed_step_ids: string[];
   responses: Record<string, number>;
+  reflection_answers: ReflectionAnswer[];
   hints_used: number;
   updated_at?: string;
   submitted_at?: string;
@@ -76,19 +77,12 @@ export interface StartAssignmentResponse {
     problem_statement: string;
     learning_objective: string;
     instructions: string[];
-    reflection_questions: ReflectionQuestion[] | string[];
+    reflection_questions: ReflectionQuestion[];
     sandbox_spec: SandboxSpec;
     generated_at: string;
   };
   cache_status: "hit" | "miss";
-  session: {
-    id: string;
-    status: SandboxSession["status"];
-    progress: {
-      completed_step_ids: string[];
-      responses: Record<string, number>;
-    };
-  };
+  session: SandboxSession;
 }
 
 export interface SandboxLaunch {
@@ -101,6 +95,7 @@ export interface ProgressRequest {
   expected_version: number;
   completed_step_ids: string[];
   responses: Record<string, number>;
+  reflection_answers: ReflectionAnswer[];
 }
 
 export interface ProgressResponse extends SandboxSession {

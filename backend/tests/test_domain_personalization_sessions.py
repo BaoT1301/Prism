@@ -75,6 +75,7 @@ def test_fixture_generation_is_valid_cached_and_session_safe(domain_db):
     provider = PersonalizationService(FixturePersonalizationProvider())
     generated, session, cache = provider.start(db, assignment, student, interests)
     assert cache == "miss" and generated.sandbox_spec["sandbox_type"] == "parameter_explorer"
+    assert generated.reflection_questions == generated.sandbox_spec["reflection_questions"]
     assert provider.start(db, assignment, student, interests)[2] == "hit"
     with pytest.raises(ApiError):
         owned_session(db, session.id, other_student)
@@ -100,10 +101,14 @@ def test_progress_hints_and_idempotent_submission(domain_db):
     domain.publish_assignment(db, assignment.id, teacher)
     interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
     _, session, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
-    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2}), db, student)
+    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 5}, reflection_answers=[{"question_id": "reflection-1", "answer": "Force increases."}]), db, student)
     assert updated["version"] == 2
+    assert updated["reflection_answers"] == [{"question_id": "reflection-1", "answer": "Force increases."}]
+    assert "explain-force" in updated["completed_step_ids"]
     with pytest.raises(ApiError):
         update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["bad"], responses={}), db, student)
+    with pytest.raises(ApiError):
+        update_progress(session.id, ProgressRequest(expected_version=2, completed_step_ids=[], responses={}, reflection_answers=[{"question_id": "unknown", "answer": "Nope"}]), db, student)
     assert hint(session.id, HintRequest(), db, student)["hint_level"] == 1
     hint(session.id, HintRequest(), db, student)
     hint(session.id, HintRequest(), db, student)

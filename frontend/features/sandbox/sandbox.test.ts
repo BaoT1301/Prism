@@ -17,10 +17,10 @@ describe("sandbox contract", () => {
   });
 
   it("calculates guided-step progress and preserves the session version", () => {
-    const session = { id: "session", version: 4, status: "in_progress" as const, completed_step_ids: [], responses: {}, hints_used: 0 };
+    const session = { id: "session", version: 4, status: "in_progress" as const, completed_step_ids: [], responses: {}, reflection_answers: [], hints_used: 0 };
     const spec = validateSandboxSpec(basketball);
     expect(progressPercentage(spec.guided_steps, ["step-1"])).toBe(33);
-    expect(buildProgressRequest(session, ["step-1"], { mass: 0.6, acceleration: 8 })).toEqual({ expected_version: 4, completed_step_ids: ["step-1"], responses: { mass: 0.6, acceleration: 8 } });
+    expect(buildProgressRequest(session, ["step-1"], { mass: 0.6, acceleration: 8 }, [{ question_id: "reflection-1", answer: "Force increases." }])).toEqual({ expected_version: 4, completed_step_ids: ["step-1"], responses: { mass: 0.6, acceleration: 8 }, reflection_answers: [{ question_id: "reflection-1", answer: "Force increases." }] });
   });
 
   it("automatically completes value and reflection checks", () => {

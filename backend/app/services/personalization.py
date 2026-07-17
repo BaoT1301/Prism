@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.core.config import Settings
 from app.core.errors import ApiError
 from app.models.models import Assignment, GeneratedAssignment, GenerationStatus, InterestProfile, Profile, SandboxSession
-from app.schemas.personalization import GeneratedContent
+from app.schemas.personalization import GeneratedContent, ReflectionQuestion
 
 CONTRACT_PATH = Path(__file__).parents[3] / "contracts" / "sandbox-spec.schema.json"
 SANDBOX_SCHEMA = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -33,7 +33,7 @@ class FixturePersonalizationProvider:
             problem_statement="Adjust mass and acceleration, then observe the force required.",
             learning_objective=assignment.learning_objective,
             instructions=["Set a mass.", "Set an acceleration.", "Compare the resulting force."],
-            reflection_questions=["How did changing acceleration affect force?"],
+            reflection_questions=[ReflectionQuestion(id="reflection-1", question="How did changing acceleration affect force?")],
             sandbox_spec={
                 "version": 1, "sandbox_type": "parameter_explorer", "visual_theme": self._theme(theme), "title": f"{theme.title()} Force Lab",
                 "introduction": f"Use this {theme} scenario to explore force.", "formula_id": "force_equals_mass_times_acceleration",
@@ -44,6 +44,7 @@ class FixturePersonalizationProvider:
                 "guided_steps": [
                     {"id": "set-mass", "instruction": "Change the mass and observe how force changes.", "completion_checks": [{"type": "value_changed", "variable_id": "mass"}]},
                     {"id": "set-acceleration", "instruction": "Increase acceleration and observe how force changes.", "completion_checks": [{"type": "value_increased", "variable_id": "acceleration"}]},
+                    {"id": "explain-force", "instruction": "Explain how acceleration affects force.", "completion_checks": [{"type": "reflection_answered", "question_id": "reflection-1"}]},
                 ],
                 "completion_rules": [{"type": "all_steps_completed"}],
                 "reflection_questions": [{"id": "reflection-1", "question": "How did changing acceleration affect force?"}],
@@ -96,6 +97,9 @@ class PersonalizationService:
         errors = list(Draft202012Validator(SANDBOX_SCHEMA).iter_errors(content.sandbox_spec))
         if errors:
             raise ApiError(502, "INVALID_AI_OUTPUT", "Generated sandbox configuration is invalid.")
+        sandbox_questions = content.sandbox_spec.get("reflection_questions", [])
+        if [question.model_dump() for question in content.reflection_questions] != sandbox_questions:
+            raise ApiError(502, "INVALID_AI_OUTPUT", "Generated reflection questions do not match the sandbox configuration.")
         forbidden = ("<script", "javascript:", "import ", "exec(", "select ")
         payload = json.dumps(content.sandbox_spec).lower()
         if any(marker in payload for marker in forbidden):
@@ -144,7 +148,7 @@ class PersonalizationService:
         pending.problem_statement = content.problem_statement
         pending.learning_objective = content.learning_objective
         pending.instructions = content.instructions
-        pending.reflection_questions = content.reflection_questions
+        pending.reflection_questions = [question.model_dump() for question in content.reflection_questions]
         pending.sandbox_spec = content.sandbox_spec
         pending.provider_response_id = content.provider_response_id
         pending.generation_latency_ms = int((perf_counter() - started) * 1000)

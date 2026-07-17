@@ -28,6 +28,7 @@ function createSession(spec: SandboxSpec): SandboxSession {
     status: "in_progress",
     completed_step_ids: [],
     responses: Object.fromEntries(spec.variables.map((variable) => [variable.id, variable.default])),
+    reflection_answers: [],
     hints_used: 0,
     updated_at: new Date().toISOString(),
   };
@@ -66,20 +67,13 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
           generated_at: new Date().toISOString(),
         },
         cache_status: existing ? "hit" : "miss",
-        session: {
-          id: state.session.id,
-          status: state.session.status,
-          progress: {
-            completed_step_ids: state.session.completed_step_ids,
-            responses: state.session.responses,
-          },
-        },
+        session: state.session,
       };
     },
 
     async launchAssignment(assignmentId: string) {
       const started = await this.startAssignment(assignmentId);
-      return { assignment: started.generated_assignment, session: await this.getSession(started.session.id), cache_status: started.cache_status };
+      return { assignment: started.generated_assignment, session: started.session, cache_status: started.cache_status };
     },
 
     async getSession(_sessionId: string): Promise<SandboxSession> {
@@ -96,6 +90,7 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
         version: state.session.version + 1,
         completed_step_ids: request.completed_step_ids,
         responses: request.responses,
+        reflection_answers: request.reflection_answers,
         updated_at: new Date().toISOString(),
       };
       writeState(state);
@@ -138,10 +133,9 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
         status: "submitted",
         submitted_at: new Date().toISOString(),
       };
-      state.session = { ...state.session, status: "submitted", submitted_at: submission.submitted_at } as SandboxSession;
+      state.session = { ...state.session, status: "submitted", reflection_answers: reflectionAnswers, submitted_at: submission.submitted_at } as SandboxSession;
       state.submission = submission;
       writeState(state);
-      void reflectionAnswers;
       return submission;
     },
 

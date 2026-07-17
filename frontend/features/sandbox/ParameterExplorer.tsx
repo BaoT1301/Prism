@@ -19,7 +19,7 @@ export function ParameterExplorer({ spec, initialSession, api, onSubmitted }: { 
   const [saveStatus, setSaveStatus] = useState<Parameters<typeof SaveStatus>[0]["status"]>("idle");
   const [hint, setHint] = useState<HintResponse>();
   const [hintError, setHintError] = useState<string>();
-  const [reflectionAnswers, setReflectionAnswers] = useState<ReflectionAnswer[]>([]);
+  const [reflectionAnswers, setReflectionAnswers] = useState<ReflectionAnswer[]>(initialSession.reflection_answers);
   const [submitting, setSubmitting] = useState(false);
   const [runToken, setRunToken] = useState(0);
   const firstRender = useRef(true);
@@ -45,7 +45,7 @@ export function ParameterExplorer({ spec, initialSession, api, onSubmitted }: { 
       setSaveStatus("saving");
       const requestSession = sessionRef.current;
       try {
-        const latest = await api.updateProgress(requestSession.id, buildProgressRequest(requestSession, completedStepIds, values));
+        const latest = await api.updateProgress(requestSession.id, buildProgressRequest(requestSession, completedStepIds, values, reflectionAnswers));
         sessionRef.current = { ...sessionRef.current, ...latest };
         setSession((current) => ({ ...current, ...latest }));
         if (generation === saveGenerationRef.current) setSaveStatus("saved");
@@ -59,7 +59,7 @@ export function ParameterExplorer({ spec, initialSession, api, onSubmitted }: { 
       }
     }, 400);
     return () => window.clearTimeout(timer);
-  }, [api, completedStepIds, values]);
+  }, [api, completedStepIds, reflectionAnswers, values]);
 
   async function requestHint() { setHintError(undefined); try { setHint(await api.requestHint(session.id, "", spec.guided_steps.find((step) => !completedStepIds.includes(step.id))?.id)); } catch (error) { setHintError(error instanceof Error ? error.message : "Unable to request a hint."); } }
   async function submit() { setSubmitting(true); try { await api.submit(session.id, session.version, reflectionAnswers); setSession((current) => ({ ...current, status: "submitted" })); onSubmitted?.(); } finally { setSubmitting(false); } }

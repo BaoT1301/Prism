@@ -19,7 +19,7 @@ describe("local sandbox demo API", () => {
   it("starts a new demo session without stale completion state", async () => {
     const storage = memoryStorage();
     storage.setItem("prism-sandbox-demo:Basketball Force Lab", JSON.stringify({
-      session: { id: "old", version: 9, status: "in_progress", completed_step_ids: ["step-1", "step-2", "step-3"], responses: {}, hints_used: 0 },
+      session: { id: "old", version: 9, status: "in_progress", completed_step_ids: ["step-1", "step-2", "step-3"], responses: {}, reflection_answers: [], hints_used: 0 },
     }));
     const launch = await createDemoSandboxApi(validateSandboxSpec(basketball), storage).launchAssignment("demo-assignment");
     expect(launch.session.completed_step_ids).toEqual([]);
@@ -40,10 +40,12 @@ describe("local sandbox demo API", () => {
       expected_version: launch.session.version,
       completed_step_ids: ["step-1"],
       responses: { mass: 0.7, acceleration: 8 },
+      reflection_answers: [{ question_id: "reflection-1", answer: "Force increases." }],
     });
     const reloaded = await api.getSession(saved.id);
     expect(reloaded.version).toBe(2);
     expect(reloaded.completed_step_ids).toEqual(["step-1"]);
     expect(reloaded.responses.mass).toBe(0.7);
+    expect(reloaded.reflection_answers).toEqual([{ question_id: "reflection-1", answer: "Force increases." }]);
   });
 });
