@@ -17,14 +17,17 @@ development.
 
 Open http://localhost:8000/docs or call GET /health.
 
-## Frontend sandbox demo
+## Frontend application
 
     npm ci
     npm run dev
 
-Open the Vite URL shown by the command (normally http://localhost:5173). This is a
-fixture-backed sandbox demo; the production student host must use Supabase Auth and
-the shared API client documented in `docs/team-handoffs/06-integration-devops-qa.md`.
+Open the Vite URL shown by the command (normally http://localhost:5173). Set
+`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_API_BASE_URL` in
+the root `.env` to use Supabase sign-in and the authenticated teacher/student flows.
+
+The standalone sandbox demo remains fixture-backed, but the main application uses
+the shared Supabase client and launches the sandbox against the authenticated API.
 
 Run checks:
 
@@ -34,3 +37,4 @@ Run checks:
     npm run build
 
 See backend/README.md for migration and Supabase auth details.
+See docs/staging-runbook.md before deploying or running the live demo flow.

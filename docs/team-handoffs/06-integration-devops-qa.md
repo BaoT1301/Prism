@@ -8,14 +8,12 @@ Read docs/team-handoffs/README.md, docs/api-contracts.md, and all role handoffs.
 - Staging/deployment integration, CORS, demo accounts, browser smoke tests, and demo
   rehearsal.
 
-## First tasks
+## Remaining integration tasks
 
-1. Add the official browser Supabase client and create one shared client under a
-   frontend location such as frontend/lib/api/.
-2. Read the Supabase session access token and set the Authorization Bearer header.
-3. Handle missing token, 401, 403, and standard backend error bodies consistently.
-4. Configure Supabase Site URL/redirect URLs and deployed backend FRONTEND_URL.
-5. Deploy frontend/backend staging and validate health/docs.
+1. Configure Supabase Site URL/redirect URLs and deployed backend `FRONTEND_URL`.
+2. Deploy frontend/backend staging and validate health/docs.
+3. Create controlled teacher/student demo accounts and confirm email if enabled.
+4. Run and record the full browser smoke flow below.
 
 ## End-to-end acceptance
 

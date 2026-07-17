@@ -12,12 +12,14 @@ and demo seeds. This work is committed on `main`.
 
 The frontend is a React 19/Vite application. It includes a tested parameter-explorer
 sandbox renderer, JSON-schema validation, deterministic formula registry, completion
-checks, and a fixture-backed browser demo. The demo adapter is intentionally local;
-the shared authenticated API client must replace it in the student host page.
+checks, and a fixture-backed standalone browser demo. The main application also has a
+shared Supabase authentication shell, authenticated teacher and student flows, and a
+student host that launches the renderer through `createSandboxApi`.
 
-Verified locally: Ruff, 19 pytest tests, 9 Vitest tests, and a production Vite build.
-Real Supabase login, applied hosted-database migration, live OpenAI generation, and
-the full deployed browser flow remain staging integration checks, not completed proof.
+Verified locally: Ruff, 23 pytest tests, 9 Vitest tests, a production Vite build,
+and browser rendering of the authentication shell. The configured hosted Supabase
+database has migration `d4dfa1e52e29` applied. A real authenticated teacher/student
+flow, live OpenAI generation, and the deployed browser flow remain staging checks.
 
 ## Shared contracts
 
@@ -44,9 +46,10 @@ the full deployed browser flow remain staging integration checks, not completed 
 
 ## Manual environment work
 
-The technical lead/integration owner must still complete:
+For a new staging or production environment, the technical lead/integration owner
+must complete:
 
-- apply the migration to Supabase Postgres;
+- apply the migration to Supabase Postgres and confirm the current revision;
 - create real teacher/student demo accounts;
 - test real Supabase login token against GET /api/v1/me;
 - test a protected live OpenAI call;
@@ -55,9 +58,9 @@ The technical lead/integration owner must still complete:
 
 ## Integration readiness
 
-The sandbox package is ready for the student frontend to consume. The endpoints it
-needs already exist, but no committed screen currently performs real Supabase login or
-launches the renderer against the deployed API. Person 6 must first provide the shared
-authenticated client; Persons 2 and 3 can then integrate their screens in parallel.
+The sandbox package is connected to the committed student frontend. The endpoints it
+needs already exist, and the app performs Supabase login plus authenticated sandbox
+launches. The remaining proof is to configure the deployed URLs, create controlled
+demo accounts, and complete the live browser smoke flow.
 
 Never commit .env, database URLs, OpenAI keys, service-role keys, or production data.
