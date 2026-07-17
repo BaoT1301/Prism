@@ -101,7 +101,8 @@ def test_progress_hints_and_idempotent_submission(domain_db):
     domain.publish_assignment(db, assignment.id, teacher)
     interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
     _, session, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
-    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 5}, reflection_answers=[{"question_id": "reflection-1", "answer": "Force increases."}]), db, student)
+    answers = [{"question_id": "reflection-1", "answer": "Force increases."}]
+    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers), db, student)
     assert updated["version"] == 2
     assert updated["reflection_answers"] == [{"question_id": "reflection-1", "answer": "Force increases."}]
     assert "explain-force" in updated["completed_step_ids"]
@@ -114,8 +115,8 @@ def test_progress_hints_and_idempotent_submission(domain_db):
     hint(session.id, HintRequest(), db, student)
     with pytest.raises(ApiError):
         hint(session.id, HintRequest(), db, student)
-    first = submit(session.id, SubmitRequest(expected_session_version=2), db, student)
-    second = submit(session.id, SubmitRequest(expected_session_version=2), db, student)
+    first = submit(session.id, SubmitRequest(expected_session_version=2, reflection_answers=answers), db, student)
+    second = submit(session.id, SubmitRequest(expected_session_version=2, reflection_answers=answers), db, student)
     assert first["id"] == second["id"]
 
 
@@ -132,3 +133,17 @@ def test_completion_checks_and_progressive_hints(domain_db):
     assert automatic_step_ids(spec, {"mass": 2, "acceleration": 5}) == {"set-mass"}
     hints = [build_progressive_hint(spec, {"mass": 2, "acceleration": 5}, [], level, "set-mass") for level in (1, 2, 3)]
     assert len(set(hints)) == 3
+
+
+def test_submission_requires_declared_completion(domain_db):
+    db, teacher, student, _, _ = domain_db
+    domain = DomainService()
+    classroom = domain.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
+    domain.join_class(db, student, classroom.join_code)
+    assignment = domain.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Force", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type="parameter_explorer"))
+    domain.publish_assignment(db, assignment.id, teacher)
+    interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
+    _, session, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
+    with pytest.raises(ApiError) as error:
+        submit(session.id, SubmitRequest(expected_session_version=1), db, student)
+    assert error.value.detail["code"] == "SANDBOX_INCOMPLETE"

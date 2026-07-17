@@ -42,6 +42,19 @@ def automatic_step_ids(
     return completed
 
 
+def submission_ready(spec: dict[str, Any], completed_step_ids: set[str], reflection_answers: dict[str, str]) -> bool:
+    all_steps = {step["id"] for step in spec.get("guided_steps", [])}
+    questions = {question["id"] for question in spec.get("reflection_questions", [])}
+    for rule in spec.get("completion_rules", []):
+        if rule.get("type") == "all_steps_completed" and not all_steps.issubset(completed_step_ids):
+            return False
+        if rule.get("type") == "step_completed" and rule.get("step_id") not in completed_step_ids:
+            return False
+        if rule.get("type") == "reflection_answered" and not all(reflection_answers.get(question_id, "").strip() for question_id in questions):
+            return False
+    return bool(spec.get("completion_rules"))
+
+
 def build_progressive_hint(
     spec: dict[str, Any],
     responses: dict[str, Any],

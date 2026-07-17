@@ -618,8 +618,8 @@ completion.
 `completion_rules` declare when the UI may enable submission: `all_steps_completed`
 requires every guided step; `step_completed` requires its `step_id`; and
 `reflection_answered` requires non-empty answers for every reflection question in the
-sandbox specification. Server-side submission enforcement is part of the backend
-correctness phase and must use these same semantics.
+sandbox specification. The backend enforces these same semantics before creating a
+submission; clients cannot bypass the completion requirements.
 
 ## 11. Health endpoints
 

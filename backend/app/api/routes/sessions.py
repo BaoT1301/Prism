@@ -19,7 +19,7 @@ from app.schemas.sessions import (
     SubmissionResponse,
     SubmitRequest,
 )
-from app.services.sandbox import automatic_step_ids, build_progressive_hint
+from app.services.sandbox import automatic_step_ids, build_progressive_hint, submission_ready
 
 router = APIRouter(tags=["sessions"])
 
@@ -99,7 +99,18 @@ def submit(session_id: uuid.UUID, data: SubmitRequest, db: Annotated[Session, De
         return {"id": existing.id, "assignment_id": existing.assignment_id, "student_id": existing.student_id, "status": "submitted", "submitted_at": existing.submitted_at}
     if item.version != data.expected_session_version:
         raise ApiError(409, "SESSION_VERSION_CONFLICT", "The sandbox session was updated by another request.")
-    submission = Submission(assignment_id=generated.assignment_id, generated_assignment_id=generated.id, session_id=item.id, student_id=student.id, responses_snapshot=item.responses, reflection_answers=[answer.model_dump() for answer in data.reflection_answers])
+    spec = generated.sandbox_spec or {}
+    question_ids = {question["id"] for question in spec.get("reflection_questions", [])}
+    if len({answer.question_id for answer in data.reflection_answers}) != len(data.reflection_answers) or not {answer.question_id for answer in data.reflection_answers}.issubset(question_ids):
+        raise ApiError(422, "INVALID_REFLECTION_ANSWER", "Reflection answers must match sandbox questions.")
+    answer_data = [answer.model_dump() for answer in data.reflection_answers]
+    answer_map = {answer.question_id: answer.answer for answer in data.reflection_answers}
+    completed_step_ids = sorted(set(item.completed_step_ids) | automatic_step_ids(spec, item.responses, answer_map))
+    if not submission_ready(spec, set(completed_step_ids), answer_map):
+        raise ApiError(409, "SANDBOX_INCOMPLETE", "Complete the required steps and reflections before submitting.")
+    item.completed_step_ids = completed_step_ids
+    item.progress = {"completed_step_ids": completed_step_ids, "responses": item.responses, "reflection_answers": answer_data}
+    submission = Submission(assignment_id=generated.assignment_id, generated_assignment_id=generated.id, session_id=item.id, student_id=student.id, responses_snapshot=item.responses, reflection_answers=answer_data)
     item.status = SandboxSessionStatus.SUBMITTED
     item.submitted_at = datetime.now(UTC)
     db.add(submission)
