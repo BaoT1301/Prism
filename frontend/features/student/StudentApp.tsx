@@ -1,0 +1,21 @@
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { apiRequest, type AccessTokenProvider } from "../../lib/api-client";
+import { createSandboxApi } from "../../lib/sandbox/sandbox-api";
+import { SandboxRenderer } from "../sandbox/SandboxRenderer";
+import type { SandboxLaunch } from "../sandbox/sandbox-types";
+
+type ClassItem = { id: string; name: string; subject: string; grade_level: string };
+type Assignment = { id: string; title: string; topic: string; status: string };
+type Interests = Record<"sports" | "games" | "movies" | "hobbies" | "career_interests" | "favorite_animals" | "favorite_subjects" | "additional_interests", string[]>;
+const empty: Interests = { sports: [], games: [], movies: [], hobbies: [], career_interests: [], favorite_animals: [], favorite_subjects: [], additional_interests: [] };
+
+export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: AccessTokenProvider; onSignOut: () => Promise<unknown> }) {
+  const [classes, setClasses] = useState<ClassItem[]>([]); const [interests, setInterests] = useState<Interests>(empty); const [selected, setSelected] = useState<string>(); const [assignments, setAssignments] = useState<Assignment[]>([]); const [launch, setLaunch] = useState<SandboxLaunch>(); const [error, setError] = useState<string>();
+  const apiBaseUrl = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_API_BASE_URL ?? "";
+  const sandboxApi = useMemo(() => createSandboxApi(apiBaseUrl, getAccessToken), [apiBaseUrl, getAccessToken]);
+  const load = () => void Promise.all([apiRequest<{ items: ClassItem[] }>("/api/v1/classes", {}, getAccessToken), apiRequest<Interests>("/api/v1/me/interests", {}, getAccessToken).catch(() => empty)]).then(([items, saved]) => { setClasses(items.items); setInterests(saved); }).catch((reason: Error) => setError(reason.message));
+  useEffect(load, [getAccessToken]);
+  useEffect(() => { if (selected) void apiRequest<{ items: Assignment[] }>(`/api/v1/classes/${selected}/assignments`, {}, getAccessToken).then((data) => setAssignments(data.items)); }, [getAccessToken, selected]);
+  if (launch) return <SandboxRenderer spec={launch.assignment.sandbox_spec} session={launch.session} api={sandboxApi} onSubmitted={() => setLaunch(undefined)} />;
+  return <main className="shell"><header><a className="brand" href="#/">Prism</a><span>Student</span><button className="link" onClick={() => void onSignOut()}>Log out</button></header><section><h1>Your learning</h1>{error && <p className="notice" role="alert">{error}</p>}<form className="form" onSubmit={(event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const code = String(new FormData(event.currentTarget).get("join_code")); void apiRequest("/api/v1/classes/join", { method: "POST", body: JSON.stringify({ join_code: code }) }, getAccessToken).then(load).catch((reason: Error) => setError(reason.message)); }}><label className="field">Join a class with its code<input name="join_code" required /></label><button>Join class</button></form><form className="form" onSubmit={(event) => { event.preventDefault(); const value = String(new FormData(event.currentTarget).get("interests")); const next = { ...empty, sports: value.split(",").map((item) => item.trim()).filter(Boolean) }; void apiRequest("/api/v1/me/interests", { method: "PUT", body: JSON.stringify(next) }, getAccessToken).then(() => setInterests(next)).catch((reason: Error) => setError(reason.message)); }}><label className="field">Your interests (comma-separated)<input name="interests" defaultValue={interests.sports.join(", ")} /></label><button>Save interests</button></form><div className="cards">{classes.map((item) => <article className="card" key={item.id}><h2>{item.name}</h2><p>{item.subject} · Grade {item.grade_level}</p><button className="secondary" onClick={() => setSelected(item.id)}>View assignments</button></article>)}</div>{selected && <section><h2>Published assignments</h2>{assignments.map((assignment) => <article className="card" key={assignment.id}><h3>{assignment.title}</h3><p>{assignment.topic}</p><button onClick={() => void sandboxApi.launchAssignment(assignment.id).then(setLaunch).catch((reason: Error) => setError(reason.message))}>Start assignment</button></article>)}</section>}</section></main>;
+}
