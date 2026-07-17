@@ -8,6 +8,8 @@ from jsonschema import Draft202012Validator
 from sqlalchemy.exc import IntegrityError
 
 from app.api.dependencies.auth import get_student, get_teacher
+from app.core.config import Settings
+from app.main import create_app
 from app.models.models import Class, Profile, UserRole
 from app.schemas.personalization import GeneratedContent
 
@@ -47,6 +49,17 @@ def test_missing_token(client):
     response = client[0].get("/api/v1/me")
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "AUTHENTICATION_REQUIRED"
+
+
+def test_development_cors_allows_localhost_and_loopback():
+    app = create_app(Settings(environment="development", frontend_url="http://localhost:5173"))
+    from fastapi.testclient import TestClient
+
+    with TestClient(app) as test_client:
+        for origin in ("http://localhost:5173", "http://127.0.0.1:5173"):
+            response = test_client.options("/api/v1/me", headers={"Origin": origin, "Access-Control-Request-Method": "GET", "Access-Control-Request-Headers": "authorization"})
+            assert response.status_code == 200
+            assert response.headers["access-control-allow-origin"] == origin
 
 
 @pytest.mark.parametrize("token", ["malformed", "expired", "wrong-issuer", "wrong-audience"])

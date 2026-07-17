@@ -17,7 +17,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     logging.basicConfig(level=settings.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
     app = FastAPI(title="Prism API", version="0.1.0", description="API for the personalized learning platform.")
-    app.add_middleware(CORSMiddleware, allow_origins=[settings.frontend_url], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+    allowed_origins = [settings.frontend_url]
+    if settings.environment in {"development", "test"}:
+        allowed_origins.extend(origin for origin in ("http://localhost:5173", "http://127.0.0.1:5173") if origin not in allowed_origins)
+    app.add_middleware(CORSMiddleware, allow_origins=allowed_origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
