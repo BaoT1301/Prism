@@ -34,13 +34,12 @@ function AssignmentForm({ initial, onSubmit, saving }: { initial?: Assignment; o
   </form>;
 }
 
-export function TeacherApp({ getAccessToken }: { getAccessToken: AccessTokenProvider }) {
+export function TeacherApp({ getAccessToken, onSignOut }: { getAccessToken: AccessTokenProvider; onSignOut: () => Promise<unknown> }) {
   const api = useMemo(() => createTeacherApi(getAccessToken), [getAccessToken]);
   const [route, setRoute] = useState(routeFor()); const [signedOut, setSignedOut] = useState(false);
   useEffect(() => { const update = () => setRoute(routeFor()); addEventListener("hashchange", update); return () => removeEventListener("hashchange", update); }, []);
   const profile = useResource(api.me, "profile");
-  async function logout() { await window.prismAuth?.signOut?.(); setSignedOut(true); }
-  if (!window.prismAuth) return <TeacherPreview />;
+  async function logout() { await onSignOut(); setSignedOut(true); }
   if (signedOut) return <main className="auth"><h1>Prism</h1><p>You have signed out.</p><p className="muted">Sign in through the shared authentication screen to continue.</p></main>;
   if (profile.loading) return <main className="shell"><Loading /></main>;
   if (profile.error?.includes("PROFILE_NOT_PROVISIONED")) return <Bootstrap api={api} />;
