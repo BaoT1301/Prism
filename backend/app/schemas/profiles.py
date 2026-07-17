@@ -14,7 +14,7 @@ class ProfileBootstrapRequest(BaseModel):
 class ProfileResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
-    auth_user_id: uuid.UUID
+    auth_user_id: str
     email: str
     display_name: str
     role: UserRole

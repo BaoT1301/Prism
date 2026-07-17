@@ -23,11 +23,12 @@ Open http://localhost:8000/docs or call GET /health.
     npm run dev
 
 Open the Vite URL shown by the command (normally http://localhost:5173). Set
-`VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`, and `VITE_API_BASE_URL` in
-the root `.env` to use Supabase sign-in and the authenticated teacher/student flows.
+`VITE_CLERK_PUBLISHABLE_KEY` and `VITE_API_BASE_URL` in the root `.env` to use
+Clerk sign-in and the authenticated teacher/student flows. The backend also needs
+the Clerk variables listed in `.env.example`.
 
 The standalone sandbox demo remains fixture-backed, but the main application uses
-the shared Supabase client and launches the sandbox against the authenticated API.
+the shared Clerk client and launches the sandbox against the authenticated API.
 
 Run checks:
 
@@ -36,5 +37,5 @@ Run checks:
     npm test
     npm run build
 
-See backend/README.md for migration and Supabase auth details.
+See backend/README.md for migration and Clerk auth details.
 See docs/staging-runbook.md before deploying or running the live demo flow.

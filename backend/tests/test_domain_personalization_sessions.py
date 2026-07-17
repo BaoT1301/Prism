@@ -1,5 +1,3 @@
-import uuid
-
 import pytest
 
 from app.api.routes.sessions import hint, owned_session, submit, update_progress
@@ -17,10 +15,10 @@ from app.services.sandbox import automatic_step_ids, build_progressive_hint
 def domain_db(client):
     _, session_factory = client
     db = session_factory()
-    teacher = Profile(auth_user_id=uuid.uuid4(), email="teacher@school.test", display_name="Teacher", role=UserRole.TEACHER)
-    student = Profile(auth_user_id=uuid.uuid4(), email="student@school.test", display_name="Student", role=UserRole.STUDENT)
-    other_student = Profile(auth_user_id=uuid.uuid4(), email="other@school.test", display_name="Other", role=UserRole.STUDENT)
-    other_teacher = Profile(auth_user_id=uuid.uuid4(), email="other-teacher@school.test", display_name="Other Teacher", role=UserRole.TEACHER)
+    teacher = Profile(auth_user_id="user_test_teacher", email="teacher@school.test", display_name="Teacher", role=UserRole.TEACHER)
+    student = Profile(auth_user_id="user_test_student", email="student@school.test", display_name="Student", role=UserRole.STUDENT)
+    other_student = Profile(auth_user_id="user_test_other_student", email="other@school.test", display_name="Other", role=UserRole.STUDENT)
+    other_teacher = Profile(auth_user_id="user_test_other_teacher", email="other-teacher@school.test", display_name="Other Teacher", role=UserRole.TEACHER)
     db.add_all([teacher, student, other_student, other_teacher])
     db.commit()
     yield db, teacher, student, other_student, other_teacher

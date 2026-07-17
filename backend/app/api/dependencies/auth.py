@@ -8,7 +8,7 @@ from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.db.session import get_db
 from app.models.models import Profile, UserRole
-from app.services.jwt import AuthClaims, SupabaseJwtVerifier, TokenVerifier
+from app.services.jwt import AuthClaims, ClerkJwtVerifier, TokenVerifier
 from app.services.profiles import ProfileService
 
 bearer = HTTPBearer(auto_error=False)
@@ -16,7 +16,7 @@ profile_service = ProfileService()
 
 
 def get_token_verifier() -> TokenVerifier:
-    return SupabaseJwtVerifier(get_settings())
+    return ClerkJwtVerifier(get_settings())
 
 
 def get_claims(credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)], verifier: Annotated[TokenVerifier, Depends(get_token_verifier)]) -> AuthClaims:

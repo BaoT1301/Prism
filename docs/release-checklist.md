@@ -19,16 +19,16 @@ Run this against the staging deployment after applying the staging runbook.
 
 ## Failure and safety checks
 
-- Missing/expired/invalid Supabase tokens return 401; wrong roles return 403/hidden 404.
+- Missing/expired/invalid Clerk session tokens return 401; wrong roles return 403/hidden 404.
 - An unpublished or non-member assignment cannot be started.
 - A stale progress version returns `SESSION_VERSION_CONFLICT` without overwriting newer state.
 - Incomplete completion rules return `SANDBOX_INCOMPLETE` on submit.
 - Invalid AI structured output/objective drift is rejected; failed generations can be retried safely.
-- No browser bundle or request log contains an OpenAI key, database URL, or Supabase service-role key.
+- No browser bundle or request log contains an OpenAI key, database URL, Clerk secret key, or Supabase service-role key.
 
 ## Deployment proof
 
 - `/health`, `/ready`, and `/docs` work on the backend host.
 - Frontend origin is the only configured production CORS origin.
-- Alembic current revision is `d4dfa1e52e29`.
+- Alembic current revision is `a27c8a345abc`.
 - GitHub Actions backend and frontend jobs pass on the release commit.

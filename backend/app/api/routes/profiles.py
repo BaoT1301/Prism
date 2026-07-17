@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_claims, get_authenticated_profile
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models.models import Profile
 from app.schemas.profiles import ProfileBootstrapRequest, ProfileResponse
@@ -21,7 +22,7 @@ def get_me(profile: Annotated[Profile, Depends(get_authenticated_profile)]) -> P
 
 @router.post("/profiles/bootstrap", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
 def bootstrap_profile(data: ProfileBootstrapRequest, claims: Annotated[AuthClaims, Depends(get_claims)], db: Annotated[Session, Depends(get_db)], response: Response) -> Profile:
-    profile, created = service.bootstrap(db, claims, data)
+    profile, created = service.bootstrap(db, claims, data, get_settings())
     if not created:
         response.status_code = status.HTTP_200_OK
     return profile

@@ -6,14 +6,15 @@ Copy the root .env.example to .env; never commit it. DATABASE_URL must be a
 SQLAlchemy URL using psycopg, for example
 postgresql+psycopg://user:password@host:5432/database.
 
-Production requires DATABASE_URL, SUPABASE_JWKS_URL, SUPABASE_ISSUER, and
-SUPABASE_AUDIENCE. Authentication verifies asymmetric Supabase JWTs using the
-configured JWKS and validates signature, issuer, audience, expiration, and subject.
+Production requires DATABASE_URL, CLERK_JWKS_URL, CLERK_ISSUER,
+CLERK_AUTHORIZED_PARTIES, and CLERK_SECRET_KEY. Authentication verifies Clerk session
+tokens with the configured JWKS and validates signature, issuer, expiration, subject,
+and authorized party. The secret key is used only to retrieve a verified user's primary
+email when the application profile is first bootstrapped.
 
-profiles.auth_user_id deliberately has no foreign key to auth.users: this repository
-has no Supabase connection or confirmed permission to create a cross-schema foreign
-key. The verified JWT subject is the application trust boundary. Add a cross-schema FK
-only after confirming it works in the target Supabase migration role.
+profiles.auth_user_id stores Clerk's immutable string user ID and has no foreign key to
+an external identity table. The verified Clerk session-token subject is the application
+trust boundary.
 
 ## Migrations
 
@@ -31,4 +32,4 @@ After migrating a local/demo database, run:
 
 This creates an idempotent teacher, three students, a Physics class, memberships,
 interest profiles, and a published Newton's Second Law assignment. It never creates
-Supabase credentials and must not be run against production.
+Clerk credentials and must not be run against production.

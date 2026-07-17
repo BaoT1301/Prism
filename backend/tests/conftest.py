@@ -1,5 +1,3 @@
-import uuid
-
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -15,7 +13,7 @@ from app.services.jwt import AuthClaims
 
 
 class FakeVerifier:
-    def __init__(self, subject: uuid.UUID) -> None:
+    def __init__(self, subject: str) -> None:
         self.claims = AuthClaims(subject=subject, email="learner@example.test")
 
     def verify(self, token: str) -> AuthClaims:
@@ -31,12 +29,12 @@ class FakeVerifier:
 
 
 @pytest.fixture
-def subject() -> uuid.UUID:
-    return uuid.uuid4()
+def subject() -> str:
+    return "user_test_learner"
 
 
 @pytest.fixture
-def client(subject: uuid.UUID):
+def client(subject: str):
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     session_factory = sessionmaker(bind=engine, expire_on_commit=False)

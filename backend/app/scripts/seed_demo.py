@@ -1,5 +1,4 @@
 """Idempotent local demo seed. Run only against a local/demo database."""
-import uuid
 
 from sqlalchemy import select
 
@@ -10,7 +9,7 @@ from app.models.models import Assignment, AssignmentStatus, Class, ClassMember, 
 def profile(db, email: str, name: str, role: UserRole) -> Profile:
     item = db.scalar(select(Profile).where(Profile.email == email))
     if item is None:
-        item = Profile(auth_user_id=uuid.uuid5(uuid.NAMESPACE_URL, email), email=email, display_name=name, role=role)
+        item = Profile(auth_user_id=f"seed_{role.value}_{email}", email=email, display_name=name, role=role)
         db.add(item)
         db.flush()
     return item

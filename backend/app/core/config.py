@@ -9,10 +9,11 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/personalized_learning"
-    supabase_url: str | None = None
-    supabase_jwks_url: str | None = None
-    supabase_issuer: str | None = None
-    supabase_audience: str | None = None
+    clerk_jwks_url: str | None = None
+    clerk_issuer: str | None = None
+    clerk_authorized_parties: str = ""
+    clerk_secret_key: str | None = Field(default=None, repr=False)
+    clerk_api_url: str = "https://api.clerk.com"
     openai_api_key: str | None = Field(default=None, repr=False)
     openai_model: str = "gpt-5.6"
     openai_moderation_model: str = "omni-moderation-latest"
@@ -38,7 +39,7 @@ class Settings(BaseSettings):
     def validate_production(self) -> None:
         if self.environment != "production":
             return
-        required = {"DATABASE_URL": self.database_url, "SUPABASE_JWKS_URL": self.supabase_jwks_url, "SUPABASE_ISSUER": self.supabase_issuer, "SUPABASE_AUDIENCE": self.supabase_audience}
+        required = {"DATABASE_URL": self.database_url, "CLERK_JWKS_URL": self.clerk_jwks_url, "CLERK_ISSUER": self.clerk_issuer, "CLERK_SECRET_KEY": self.clerk_secret_key, "CLERK_AUTHORIZED_PARTIES": self.clerk_authorized_parties}
         absent = [name for name, value in required.items() if not value]
         if absent:
             raise RuntimeError(f"Missing required production configuration: {', '.join(absent)}")

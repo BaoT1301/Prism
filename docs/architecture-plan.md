@@ -41,7 +41,7 @@ contract remains independent of presentation choices.
 ### Managed services
 
 - Supabase Postgres
-- Supabase Auth
+- Clerk Auth
 - OpenAI Responses API
 - Vercel for frontend
 - Railway, Render, Fly.io, or another persistent container host for FastAPI
@@ -64,11 +64,11 @@ FastAPI gives the backend owner:
 
 A single-language TypeScript stack would reduce language switching, but strong validation and the AI/data workflow are more important for this MVP.
 
-### Supabase Auth over custom JWT authentication
+### Clerk Auth over custom authentication
 
-Custom signup, password storage, refresh-token logic, email verification, and reset flows are not the product innovation. Supabase Auth should issue the user access token. FastAPI verifies the token and loads the application profile and role.
+Custom signup, password storage, refresh-token logic, email verification, and reset flows are not the product innovation. Clerk issues the user session token. FastAPI verifies the token and loads the application profile and role.
 
-New Supabase projects should prefer asymmetric signing keys and JWKS verification. The backend must not rely on a client-provided role.
+Clerk session tokens are verified through the instance JWKS. The backend must not rely on a client-provided role.
 
 ### REST over GraphQL
 
@@ -95,7 +95,7 @@ Do not add Redis or a worker queue unless measured generation latency makes the 
 ```text
 Browser / React + Vite
     |
-    | Supabase login and session
+    | Clerk login and session
     | Authorization: Bearer <access token>
     v
 FastAPI monolith
@@ -229,10 +229,10 @@ Backend:
 ENVIRONMENT
 LOG_LEVEL
 DATABASE_URL
-SUPABASE_URL
-SUPABASE_JWKS_URL
-SUPABASE_ISSUER
-SUPABASE_AUDIENCE
+CLERK_JWKS_URL
+CLERK_ISSUER
+CLERK_AUTHORIZED_PARTIES
+CLERK_SECRET_KEY
 OPENAI_API_KEY
 OPENAI_MODEL
 OPENAI_MODERATION_MODEL
@@ -243,18 +243,17 @@ DEMO_MODE
 Frontend-owned variables may include:
 
 ```text
-VITE_SUPABASE_URL
-VITE_SUPABASE_PUBLISHABLE_KEY
+VITE_CLERK_PUBLISHABLE_KEY
 VITE_API_BASE_URL
 ```
 
-Do not put a Supabase secret/service key in the browser.
+Do not put a Clerk secret key in the browser.
 
 ## 8. Authentication and authorization
 
 ### Authentication
 
-- Frontend authenticates with Supabase Auth.
+- Frontend authenticates with Clerk.
 - Frontend passes the access token to FastAPI.
 - FastAPI verifies signature, issuer, audience, expiration, and subject.
 - FastAPI maps `sub` to `profiles.auth_user_id`.
@@ -407,7 +406,7 @@ Own:
 
 - FastAPI structure
 - Database models and migrations
-- Supabase JWT verification
+- Clerk JWT verification
 - Role authorization
 - Class, assignment, interest, start, session, and submission APIs
 - AI orchestration boundary
@@ -449,11 +448,11 @@ Own deployed smoke tests, generated frontend types, environment coordination, CI
 Run the Vite frontend separately with `npm run dev` (default origin
 `http://localhost:5173`).
 
-Use hosted Supabase for true auth integration, or fake auth dependencies in tests.
+Use Clerk for true auth integration, or fake auth dependencies in tests.
 
 ### Staging
 
-- One shared Supabase project
+- One shared Clerk application and Supabase Postgres project
 - One backend deployment
 - One frontend deployment
 - Seeded demo users and class
@@ -502,7 +501,7 @@ Mitigation: database uniqueness and idempotent start behavior.
 
 ### Auth delays
 
-Mitigation: Supabase Auth, dependency-overridden tests, seed profiles.
+Mitigation: Clerk Auth, dependency-overridden tests, seed profiles.
 
 ### Sandbox scope explosion
 

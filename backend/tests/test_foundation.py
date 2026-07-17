@@ -1,5 +1,4 @@
 import json
-import uuid
 from pathlib import Path
 
 import pytest
@@ -62,6 +61,15 @@ def test_development_cors_allows_localhost_and_loopback():
             assert response.headers["access-control-allow-origin"] == origin
 
 
+def test_production_requires_clerk_auth_settings():
+    incomplete = Settings(environment="production")
+    with pytest.raises(RuntimeError, match="CLERK_JWKS_URL"):
+        incomplete.validate_production()
+    settings = Settings(environment="production", clerk_jwks_url="https://clerk.example/.well-known/jwks.json", clerk_issuer="https://clerk.example", clerk_authorized_parties="https://app.example", clerk_secret_key="secret_test_key")
+    settings.validate_production()
+    assert settings.clerk_issuer == "https://clerk.example"
+
+
 @pytest.mark.parametrize("token", ["malformed", "expired", "wrong-issuer", "wrong-audience"])
 def test_invalid_tokens(client, token):
     response = client[0].get("/api/v1/me", headers=auth(token))
@@ -110,8 +118,8 @@ def test_class_contract_includes_live_counts(client):
 
 
 def test_role_dependencies():
-    teacher = Profile(auth_user_id=uuid.uuid4(), email="teacher@example.test", display_name="Teacher", role=UserRole.TEACHER)
-    student = Profile(auth_user_id=uuid.uuid4(), email="student@example.test", display_name="Student", role=UserRole.STUDENT)
+    teacher = Profile(auth_user_id="user_test_teacher", email="teacher@example.test", display_name="Teacher", role=UserRole.TEACHER)
+    student = Profile(auth_user_id="user_test_student", email="student@example.test", display_name="Student", role=UserRole.STUDENT)
     assert get_teacher(teacher) is teacher
     assert get_student(student) is student
     with pytest.raises(HTTPException) as exc:
@@ -122,7 +130,7 @@ def test_role_dependencies():
 def test_important_database_uniqueness_constraints(client):
     _, session_factory = client
     db = session_factory()
-    teacher = Profile(auth_user_id=uuid.uuid4(), email="teacher@example.test", display_name="Teacher", role=UserRole.TEACHER)
+    teacher = Profile(auth_user_id="user_test_teacher", email="teacher@example.test", display_name="Teacher", role=UserRole.TEACHER)
     db.add(teacher)
     db.commit()
     db.add_all([

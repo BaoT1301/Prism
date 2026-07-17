@@ -3,7 +3,7 @@
 ## 1. Database principles
 
 - PostgreSQL is the source of truth.
-- Supabase Auth owns credentials and auth sessions.
+- Clerk owns credentials and auth sessions.
 - Application tables store product data and roles.
 - Use UUID primary keys.
 - Use timezone-aware timestamps with server defaults.
@@ -14,15 +14,17 @@
 
 ## 2. Auth relationship
 
-Supabase stores authenticated identities in `auth.users`.
+Clerk stores authenticated identities outside this database.
 
 Application table:
 
 ```text
-profiles.auth_user_id -> auth.users.id
+profiles.auth_user_id -> Clerk user ID
 ```
 
-Depending on connection permissions and migration environment, the foreign key to `auth.users` may be created directly or represented as a unique UUID with application-level verification. Codex must inspect the selected Supabase setup before assuming cross-schema migration permissions.
+The application stores Clerk's immutable string user ID as a unique external identity
+reference. There is intentionally no cross-service foreign key; verified Clerk JWTs
+are the application trust boundary.
 
 ## 3. Enums
 
@@ -59,7 +61,7 @@ Purpose: application identity and role.
 
 ```text
 id              UUID PK
-auth_user_id    UUID NOT NULL UNIQUE
+auth_user_id    VARCHAR(128) NOT NULL UNIQUE
 email           CITEXT or VARCHAR NOT NULL
 display_name    VARCHAR(120) NOT NULL
 role            user_role NOT NULL
@@ -71,12 +73,12 @@ Indexes:
 
 - unique `auth_user_id`
 - optional index on `role`
-- optional unique normalized email only if product requirements require it; Supabase already controls auth uniqueness
+- optional unique normalized email only if product requirements require it; Clerk controls identity-email uniqueness
 
 Rules:
 
 - Role is immutable through normal profile update APIs.
-- Email comes from verified auth claims or trusted Supabase lookup.
+- Email comes from a verified Clerk token claim or trusted Clerk Backend API lookup.
 
 ### `classes`
 
@@ -427,7 +429,7 @@ Create an idempotent seed command for local/demo environments:
 - One published Newton's Second Law assignment
 - Optional pre-generated personalized assignment fixtures
 
-Do not seed production credentials. Auth users may need to be created through a separate documented Supabase admin/dev process.
+Do not seed production credentials. Auth users must be created through Clerk.
 
 ## 9. Database tests
 

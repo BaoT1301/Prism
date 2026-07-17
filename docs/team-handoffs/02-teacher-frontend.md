@@ -1,7 +1,7 @@
 # Person 2 - Teacher Frontend
 
 Read docs/team-handoffs/README.md and docs/api-contracts.md. Use Person 6's shared
-authenticated API client; do not implement separate Supabase token handling.
+authenticated API client; do not implement separate Clerk token handling.
 
 ## Own
 
@@ -21,7 +21,7 @@ authenticated API client; do not implement separate Supabase token handling.
 
 ## Required behavior
 
-- Attach the Supabase access token on every request.
+- Attach the Clerk session token on every request.
 - Show standardized backend errors and request ID where useful for support.
 - Treat a published assignment as read-only; backend returns 409 for content edits.
 - Include loading, no-class/no-member/no-submission, and authorization states.

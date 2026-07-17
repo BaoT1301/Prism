@@ -17,7 +17,7 @@ application/json
 Authentication:
 
 ```text
-Authorization: Bearer <supabase_access_token>
+Authorization: Bearer <clerk_session_token>
 ```
 
 IDs are UUID strings. Timestamps are ISO 8601 UTC strings.
@@ -94,7 +94,7 @@ Response `200`:
 ```json
 {
   "id": "f230f06d-a9b0-4e3c-b191-bf8c14ae6907",
-  "auth_user_id": "624ddde8-d40a-4144-987d-fc8a98e600da",
+  "auth_user_id": "user_2xExampleClerkUserId",
   "email": "teacher@example.com",
   "display_name": "Ms. Rivera",
   "role": "teacher",
