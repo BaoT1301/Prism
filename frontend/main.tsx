@@ -20,6 +20,8 @@ function App() {
   return (
     <ClerkProvider
       publishableKey={clerkKey}
+      signInUrl="/#/sign-in"
+      signUpUrl="/#/sign-up"
       appearance={{
         variables: {
           colorPrimary: "#2922a8",

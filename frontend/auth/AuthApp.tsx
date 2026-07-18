@@ -66,7 +66,14 @@ export function AuthApp() {
           <h2>Step into your classroom.</h2>
           <p>Sign in or create an account. Your work will be right where you left it.</p>
         </div>
-        <SignIn routing="hash" withSignUp fallbackRedirectUrl="/" signUpFallbackRedirectUrl="/" />
+        <SignIn
+          routing="hash"
+          signInUrl="/#/sign-in"
+          signUpUrl="/#/sign-up"
+          withSignUp
+          fallbackRedirectUrl="/#/"
+          signUpFallbackRedirectUrl="/#/"
+        />
       </AuthLayout>
     );
   }
