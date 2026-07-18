@@ -16,7 +16,8 @@ services:
       - postgres_data:/var/lib/postgresql/data
   api:
     build:
-      context: ./backend
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/personalized_learning
       FRONTEND_URL: http://localhost:5173

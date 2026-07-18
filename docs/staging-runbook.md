@@ -2,7 +2,10 @@
 
 Use a non-production Supabase project for this checklist.
 
-1. Set backend secrets in the backend host: `DATABASE_URL`, `CLERK_JWKS_URL`,
+1. For Railway, leave the service root directory at the repository root. The committed
+   `railway.toml` selects `backend/Dockerfile` and includes the root `contracts/`
+   directory required for sandbox validation. Set backend secrets in the backend host:
+   `DATABASE_URL`, `CLERK_JWKS_URL`,
    `CLERK_ISSUER`, `CLERK_AUTHORIZED_PARTIES`, `CLERK_SECRET_KEY`, `OPENAI_API_KEY`,
    `FRONTEND_URL`, and `DEMO_MODE=false`.
 2. Apply the migration with `alembic -c backend/alembic.ini upgrade head` and confirm
