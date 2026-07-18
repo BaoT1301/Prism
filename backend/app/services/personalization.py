@@ -144,11 +144,19 @@ class FixturePersonalizationProvider:
     def _personal_scene(interest: str, visual_theme: str) -> dict[str, object]:
         normalized = interest.casefold()
         for markers, scene in (
+            (("science", "biology", "chemistry", "robotics"), {"setting": "science_lab", "primary_prop": "microscope" if "biology" in normalized or "chemistry" in normalized else "robot", "accent_props": ["planet", "book_stack"], "mood": "daylight", "label": "Your discovery lab"}),
+            (("cook", "bake", "food", "recipe"), {"setting": "kitchen", "primary_prop": "chef_hat", "accent_props": ["plant", "book_stack"], "mood": "sunset", "label": "Your test kitchen"}),
             (("music", "guitar", "piano", "band"), {"setting": "music_room", "primary_prop": "guitar", "accent_props": ["headphones", "book_stack"], "mood": "sunset", "label": "Your after-school studio"}),
+            (("dance", "concert", "sing", "theater"), {"setting": "concert_stage", "primary_prop": "guitar", "accent_props": ["headphones", "flower"], "mood": "neon", "label": "Your spotlight stage"}),
             (("gaming", "game", "esports"), {"setting": "gaming_desk", "primary_prop": "controller", "accent_props": ["headphones", "plant"], "mood": "neon", "label": "Your game-night setup"}),
             (("art", "draw", "paint", "design"), {"setting": "art_studio", "primary_prop": "sketchbook", "accent_props": ["camera", "plant"], "mood": "daylight", "label": "Your creative studio"}),
+            (("ocean", "surf", "beach", "marine"), {"setting": "ocean", "primary_prop": "surfboard", "accent_props": ["drone", "flower"], "mood": "daylight", "label": "Your ocean-side lab"}),
+            (("hike", "mountain", "outdoor", "nature"), {"setting": "mountain_trail", "primary_prop": "drone", "accent_props": ["plant", "camera"], "mood": "sunset", "label": "Your mountain trail"}),
+            (("animal", "pet", "dog", "cat", "wildlife"), {"setting": "animal_sanctuary", "primary_prop": "animal_friend", "accent_props": ["flower", "camera"], "mood": "daylight", "label": "Your animal sanctuary"}),
+            (("gym", "fitness", "tennis", "baseball"), {"setting": "sports_gym", "primary_prop": "tennis_racket" if "tennis" in normalized else "baseball" if "baseball" in normalized else "dumbbell", "accent_props": ["dumbbell", "headphones"], "mood": "neon", "label": "Your training gym"}),
             (("soccer", "football", "skate"), {"setting": "city_park", "primary_prop": "soccer_ball" if "soccer" in normalized or "football" in normalized else "skateboard", "accent_props": ["camera", "headphones"], "mood": "sunset", "label": "Your neighborhood park"}),
             (("photo", "camera", "film"), {"setting": "workshop", "primary_prop": "camera", "accent_props": ["sketchbook", "plant"], "mood": "daylight", "label": "Your maker workshop"}),
+            (("read", "book", "chess", "history"), {"setting": "library", "primary_prop": "chess_piece" if "chess" in normalized else "book_stack", "accent_props": ["laptop", "plant"], "mood": "daylight", "label": "Your quiet library"}),
         ):
             if any(marker in normalized for marker in markers):
                 return scene

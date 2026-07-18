@@ -51,7 +51,15 @@
             "gaming_desk",
             "art_studio",
             "city_park",
-            "workshop"
+            "workshop",
+            "science_lab",
+            "kitchen",
+            "concert_stage",
+            "ocean",
+            "mountain_trail",
+            "animal_sanctuary",
+            "sports_gym",
+            "library"
           ]
         },
         "primary_prop": {
@@ -67,7 +75,21 @@
             "skateboard",
             "book_stack",
             "headphones",
-            "plant"
+            "plant",
+            "microscope",
+            "robot",
+            "chef_hat",
+            "surfboard",
+            "animal_friend",
+            "dumbbell",
+            "chess_piece",
+            "drone",
+            "flower",
+            "paint_palette",
+            "tennis_racket",
+            "planet",
+            "laptop",
+            "baseball"
           ]
         },
         "accent_props": {
@@ -86,7 +108,21 @@
               "skateboard",
               "book_stack",
               "headphones",
-              "plant"
+              "plant",
+              "microscope",
+              "robot",
+              "chef_hat",
+              "surfboard",
+              "animal_friend",
+              "dumbbell",
+              "chess_piece",
+              "drone",
+              "flower",
+              "paint_palette",
+              "tennis_racket",
+              "planet",
+              "laptop",
+              "baseball"
             ]
           }
         },

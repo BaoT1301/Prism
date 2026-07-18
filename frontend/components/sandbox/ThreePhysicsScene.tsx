@@ -51,6 +51,14 @@ const scenePalette = {
   art_studio: { floor: 0xf1d5bd, sky: 0x6c5a98 },
   city_park: { floor: 0x94c75f, sky: 0x5387a0 },
   workshop: { floor: 0xb2a796, sky: 0x483f38 },
+  science_lab: { floor: 0xdce8e8, sky: 0x4d7898 },
+  kitchen: { floor: 0xe9d5b7, sky: 0xa85e47 },
+  concert_stage: { floor: 0x24202f, sky: 0x511e72 },
+  ocean: { floor: 0x3d9db2, sky: 0x22547d },
+  mountain_trail: { floor: 0x6f8f5a, sky: 0x55778c },
+  animal_sanctuary: { floor: 0x9fbd63, sky: 0x8fb6c1 },
+  sports_gym: { floor: 0xc99557, sky: 0x384b68 },
+  library: { floor: 0x9e7653, sky: 0x554052 },
 } as const;
 
 function addPersonalProp(scene: Scene, prop: PersonalSceneProp, x: number, z: number, scale = 0.65) {
@@ -59,7 +67,7 @@ function addPersonalProp(scene: Scene, prop: PersonalSceneProp, x: number, z: nu
   const coral = new MeshStandardMaterial({ color: 0xe86a36, roughness: 0.55 });
   const paper = new MeshStandardMaterial({ color: 0xf6f0e3, roughness: 0.55 });
   const lime = new MeshStandardMaterial({ color: 0xd9ed66, roughness: 0.7 });
-  if (prop === "basketball" || prop === "soccer_ball") group.add(new Mesh(new SphereGeometry(0.5, 20, 16), prop === "basketball" ? coral : paper));
+  if (prop === "basketball" || prop === "soccer_ball" || prop === "baseball") group.add(new Mesh(new SphereGeometry(0.5, 20, 16), prop === "basketball" ? coral : paper));
   if (prop === "race_car") group.add(new Mesh(new BoxGeometry(1.3, 0.26, 0.62), coral));
   if (prop === "rocket") { const rocket = new Mesh(new ConeGeometry(0.35, 1.15, 16), paper); rocket.rotation.z = -Math.PI / 2; group.add(rocket); }
   if (prop === "guitar") { group.add(new Mesh(new SphereGeometry(0.38, 16, 12), coral), new Mesh(new BoxGeometry(0.16, 1.1, 0.12), ink)); }
@@ -70,6 +78,19 @@ function addPersonalProp(scene: Scene, prop: PersonalSceneProp, x: number, z: nu
   if (prop === "book_stack") { for (let index = 0; index < 3; index += 1) { const book = new Mesh(new BoxGeometry(0.86, 0.16, 0.58), index === 1 ? coral : index === 2 ? lime : paper); book.position.y = index * 0.17; group.add(book); } }
   if (prop === "headphones") { const band = new Mesh(new TorusGeometry(0.38, 0.06, 8, 20, Math.PI), ink); band.rotation.z = Math.PI; group.add(band); for (const side of [-1, 1]) { const cup = new Mesh(new SphereGeometry(0.12, 12, 8), coral); cup.position.set(side * 0.36, -0.15, 0); group.add(cup); } }
   if (prop === "plant") { const pot = new Mesh(new CylinderGeometry(0.23, 0.3, 0.34, 10), coral); pot.position.y = -0.15; group.add(pot); for (let index = 0; index < 4; index += 1) { const leaf = new Mesh(new ConeGeometry(0.16, 0.65, 8), lime); leaf.position.set((index - 1.5) * 0.12, 0.28, 0); leaf.rotation.z = (index - 1.5) * 0.35; group.add(leaf); } }
+  if (prop === "microscope") { const base = new Mesh(new BoxGeometry(0.9, 0.12, 0.56), ink); const scope = new Mesh(new CylinderGeometry(0.11, 0.15, 0.95, 12), paper); scope.rotation.z = -0.45; scope.position.set(0.05, 0.45, 0); group.add(base, scope); }
+  if (prop === "robot") { const body = new Mesh(new BoxGeometry(0.58, 0.64, 0.4), paper); body.position.y = 0.3; const head = new Mesh(new BoxGeometry(0.5, 0.38, 0.38), lime); head.position.y = 0.85; group.add(body, head); for (const side of [-1, 1]) { const leg = new Mesh(new CylinderGeometry(0.06, 0.06, 0.42, 8), ink); leg.position.set(side * 0.16, -0.05, 0); group.add(leg); } }
+  if (prop === "chef_hat") { const cap = new Mesh(new SphereGeometry(0.43, 16, 12), paper); cap.scale.y = 0.75; cap.position.y = 0.35; group.add(cap, new Mesh(new CylinderGeometry(0.34, 0.34, 0.22, 16), paper)); }
+  if (prop === "surfboard") { const board = new Mesh(new SphereGeometry(0.42, 16, 12), coral); board.scale.set(0.52, 2.2, 0.22); board.rotation.z = 0.25; group.add(board); }
+  if (prop === "animal_friend") { const body = new Mesh(new SphereGeometry(0.38, 16, 12), paper); body.position.y = 0.2; const head = new Mesh(new SphereGeometry(0.28, 16, 12), paper); head.position.set(0.3, 0.56, 0); group.add(body, head); for (const earX of [0.16, 0.43]) { const ear = new Mesh(new ConeGeometry(0.1, 0.25, 8), coral); ear.position.set(earX, 0.86, 0); group.add(ear); } }
+  if (prop === "dumbbell") { const bar = new Mesh(new CylinderGeometry(0.06, 0.06, 1.1, 10), ink); bar.rotation.z = Math.PI / 2; group.add(bar); for (const side of [-1, 1]) { const weight = new Mesh(new CylinderGeometry(0.22, 0.22, 0.14, 12), coral); weight.rotation.z = Math.PI / 2; weight.position.x = side * 0.52; group.add(weight); } }
+  if (prop === "chess_piece") { const base = new Mesh(new CylinderGeometry(0.32, 0.38, 0.16, 16), ink); base.position.y = -0.12; const piece = new Mesh(new ConeGeometry(0.2, 0.72, 16), paper); piece.position.y = 0.3; group.add(base, piece, new Mesh(new SphereGeometry(0.14, 12, 8), coral)); }
+  if (prop === "drone") { const body = new Mesh(new BoxGeometry(0.46, 0.12, 0.46), ink); group.add(body); for (const [armX, armZ] of [[-0.42, -0.42], [-0.42, 0.42], [0.42, -0.42], [0.42, 0.42]]) { const arm = new Mesh(new CylinderGeometry(0.035, 0.035, 0.7, 8), paper); arm.rotation.z = Math.PI / 2; arm.rotation.y = Math.atan2(armZ, armX); arm.position.set(armX / 2, 0, armZ / 2); const rotor = new Mesh(new TorusGeometry(0.13, 0.018, 6, 12), coral); rotor.rotation.x = Math.PI / 2; rotor.position.set(armX, 0.06, armZ); group.add(arm, rotor); } }
+  if (prop === "flower") { const stem = new Mesh(new CylinderGeometry(0.035, 0.035, 0.75, 8), lime); stem.position.y = 0.28; group.add(stem); for (let index = 0; index < 5; index += 1) { const petal = new Mesh(new SphereGeometry(0.13, 10, 8), coral); const angle = index * (Math.PI * 2 / 5); petal.position.set(Math.cos(angle) * 0.18, 0.7, Math.sin(angle) * 0.18); group.add(petal); } const center = new Mesh(new SphereGeometry(0.11, 10, 8), paper); center.position.y = 0.7; group.add(center); }
+  if (prop === "paint_palette") { const palette = new Mesh(new SphereGeometry(0.42, 16, 12), paper); palette.scale.set(1.2, 0.18, 0.9); group.add(palette); [[-0.22, 0.1], [0.03, -0.12], [0.25, 0.13]].forEach(([paintX, paintZ], index) => { const paint = new Mesh(new SphereGeometry(0.07, 10, 8), [coral, lime, ink][index]); paint.position.set(paintX, 0.09, paintZ); group.add(paint); }); }
+  if (prop === "tennis_racket") { const frame = new Mesh(new TorusGeometry(0.35, 0.04, 8, 20), coral); frame.scale.y = 1.3; frame.position.y = 0.25; const handle = new Mesh(new BoxGeometry(0.11, 0.52, 0.1), ink); handle.position.y = -0.42; group.add(frame, handle); }
+  if (prop === "planet") { const planet = new Mesh(new SphereGeometry(0.42, 20, 16), coral); const ring = new Mesh(new TorusGeometry(0.58, 0.03, 8, 24), paper); ring.rotation.x = 1.18; group.add(planet, ring); }
+  if (prop === "laptop") { const base = new Mesh(new BoxGeometry(0.88, 0.08, 0.58), ink); const screen = new Mesh(new BoxGeometry(0.88, 0.56, 0.06), paper); screen.position.set(0, 0.3, -0.25); screen.rotation.x = -0.22; group.add(base, screen); }
   group.position.set(x, 0.42, z);
   group.scale.setScalar(scale);
   group.rotation.y = (x + z) * 0.4;

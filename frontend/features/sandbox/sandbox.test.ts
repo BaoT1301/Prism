@@ -20,6 +20,11 @@ describe("sandbox contract", () => {
 
   it("accepts only the finite personal-scene catalog", () => {
     expect(validateSandboxSpec(basketball).personal_scene?.label).toBe("Your after-school court");
+    const scienceScene: Record<string, unknown> = structuredClone(basketball);
+    (scienceScene.personal_scene as Record<string, unknown>).setting = "science_lab";
+    (scienceScene.personal_scene as Record<string, unknown>).primary_prop = "microscope";
+    (scienceScene.personal_scene as Record<string, unknown>).accent_props = ["robot", "planet"];
+    expect(validateSandboxSpec(scienceScene).personal_scene?.primary_prop).toBe("microscope");
     const unsafeScene: Record<string, unknown> = structuredClone(basketball);
     (unsafeScene.personal_scene as Record<string, unknown>).setting = "private_home";
     expect(() => validateSandboxSpec(unsafeScene)).toThrow("personal scene");

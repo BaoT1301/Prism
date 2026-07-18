@@ -29,8 +29,8 @@ export function validateSandboxSpec(value: unknown): SandboxSpec {
   }
   const personalScene = candidate.personal_scene;
   if (personalScene) {
-    const settings = ["court", "racetrack", "launchpad", "music_room", "gaming_desk", "art_studio", "city_park", "workshop"];
-    const props = ["basketball", "race_car", "rocket", "guitar", "controller", "sketchbook", "soccer_ball", "camera", "skateboard", "book_stack", "headphones", "plant"];
+    const settings = ["court", "racetrack", "launchpad", "music_room", "gaming_desk", "art_studio", "city_park", "workshop", "science_lab", "kitchen", "concert_stage", "ocean", "mountain_trail", "animal_sanctuary", "sports_gym", "library"];
+    const props = ["basketball", "race_car", "rocket", "guitar", "controller", "sketchbook", "soccer_ball", "camera", "skateboard", "book_stack", "headphones", "plant", "microscope", "robot", "chef_hat", "surfboard", "animal_friend", "dumbbell", "chess_piece", "drone", "flower", "paint_palette", "tennis_racket", "planet", "laptop", "baseball"];
     if (!settings.includes(personalScene.setting) || !props.includes(personalScene.primary_prop) || !["daylight", "sunset", "neon", "starlight"].includes(personalScene.mood)) {
       throw new Error("Sandbox personal scene is unsupported.");
     }

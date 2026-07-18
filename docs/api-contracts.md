@@ -502,6 +502,9 @@ validated setting, primary prop, up to two accent props, mood, and display label
 the finite frontend catalog. The renderer owns every mesh, material, animation, and
 asset decision. The model must never provide model files, URLs, shaders, or executable
 3D content. Older cached assignments render the theme default when this field is absent.
+The current catalog includes school-safe scenes for sports, science, food, music,
+gaming, art, outdoors, animals, fitness, and reading; the exact allowlist lives in the
+sandbox JSON schema and frontend validator.
 
 ### POST `/sandbox-sessions/{session_id}/hint`
 

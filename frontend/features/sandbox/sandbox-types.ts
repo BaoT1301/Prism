@@ -1,8 +1,8 @@
 export type SandboxType = "parameter_explorer";
 export type FormulaId = "force_equals_mass_times_acceleration";
 export type VisualTheme = "basketball" | "formula1" | "space";
-export type PersonalSceneSetting = "court" | "racetrack" | "launchpad" | "music_room" | "gaming_desk" | "art_studio" | "city_park" | "workshop";
-export type PersonalSceneProp = "basketball" | "race_car" | "rocket" | "guitar" | "controller" | "sketchbook" | "soccer_ball" | "camera" | "skateboard" | "book_stack" | "headphones" | "plant";
+export type PersonalSceneSetting = "court" | "racetrack" | "launchpad" | "music_room" | "gaming_desk" | "art_studio" | "city_park" | "workshop" | "science_lab" | "kitchen" | "concert_stage" | "ocean" | "mountain_trail" | "animal_sanctuary" | "sports_gym" | "library";
+export type PersonalSceneProp = "basketball" | "race_car" | "rocket" | "guitar" | "controller" | "sketchbook" | "soccer_ball" | "camera" | "skateboard" | "book_stack" | "headphones" | "plant" | "microscope" | "robot" | "chef_hat" | "surfboard" | "animal_friend" | "dumbbell" | "chess_piece" | "drone" | "flower" | "paint_palette" | "tennis_racket" | "planet" | "laptop" | "baseball";
 export type PersonalSceneMood = "daylight" | "sunset" | "neon" | "starlight";
 
 export interface PersonalScene {
