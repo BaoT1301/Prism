@@ -27,6 +27,18 @@ export function validateSandboxSpec(value: unknown): SandboxSpec {
   if (candidate.visual_theme && !["basketball", "formula1", "space"].includes(candidate.visual_theme)) {
     throw new Error("Unsupported sandbox visual theme.");
   }
+  const personalScene = candidate.personal_scene;
+  if (personalScene) {
+    const settings = ["court", "racetrack", "launchpad", "music_room", "gaming_desk", "art_studio", "city_park", "workshop"];
+    const props = ["basketball", "race_car", "rocket", "guitar", "controller", "sketchbook", "soccer_ball", "camera", "skateboard", "book_stack", "headphones", "plant"];
+    if (!settings.includes(personalScene.setting) || !props.includes(personalScene.primary_prop) || !["daylight", "sunset", "neon", "starlight"].includes(personalScene.mood)) {
+      throw new Error("Sandbox personal scene is unsupported.");
+    }
+    safeText(personalScene.label, "personal scene label");
+    if (!Array.isArray(personalScene.accent_props) || personalScene.accent_props.length > 2 || personalScene.accent_props.some((prop) => !props.includes(prop))) {
+      throw new Error("Sandbox personal scene accents are invalid.");
+    }
+  }
   if (!Array.isArray(candidate.variables) || candidate.variables.length < 2 || candidate.variables.length > 4) {
     throw new Error("Sandbox must contain between two and four variables.");
   }

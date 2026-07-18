@@ -346,6 +346,7 @@ The AI may choose supported values and configure:
 - Guided steps
 - Reflection questions
 - Completion rules
+- A bounded personal-scene composition from renderer-owned settings and props
 
 The AI may not provide:
 
@@ -356,6 +357,7 @@ The AI may not provide:
 - Shell commands
 - Arbitrary formulas to evaluate
 - External URLs to execute
+- Meshes, model files, shaders, textures, or arbitrary 3D instructions
 
 Initial formula registry example:
 

@@ -18,6 +18,13 @@
     "version": 1,
     "sandbox_type": "parameter_explorer",
     "visual_theme": "basketball",
+    "personal_scene": {
+      "setting": "court",
+      "primary_prop": "basketball",
+      "accent_props": ["headphones", "camera"],
+      "mood": "sunset",
+      "label": "Your after-school court"
+    },
     "title": "Basketball Force Lab",
     "introduction": "Explore how the mass and acceleration of a basketball affect the force required for a pass.",
     "formula_id": "force_equals_mass_times_acceleration",

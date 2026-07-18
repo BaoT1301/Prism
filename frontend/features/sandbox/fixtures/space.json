@@ -2,6 +2,7 @@
   "version": 1,
   "sandbox_type": "parameter_explorer",
   "visual_theme": "space",
+  "personal_scene": { "setting": "launchpad", "primary_prop": "rocket", "accent_props": ["camera", "book_stack"], "mood": "starlight", "label": "Your launchpad after dark" },
   "title": "Rocket Force Lab",
   "introduction": "Explore how a rocket's mass and acceleration affect the thrust force required for launch.",
   "formula_id": "force_equals_mass_times_acceleration",

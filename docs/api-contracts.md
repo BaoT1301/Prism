@@ -497,6 +497,12 @@ personalized assignments may include it to expose deterministic numeric constrai
 cached assignments without it continue to use the original guided-step completion
 rules and remain submit-able.
 
+`sandbox_spec.personal_scene` is also optional and presentation-only. It contains a
+validated setting, primary prop, up to two accent props, mood, and display label from
+the finite frontend catalog. The renderer owns every mesh, material, animation, and
+asset decision. The model must never provide model files, URLs, shaders, or executable
+3D content. Older cached assignments render the theme default when this field is absent.
+
 ### POST `/sandbox-sessions/{session_id}/hint`
 
 Student owner only.

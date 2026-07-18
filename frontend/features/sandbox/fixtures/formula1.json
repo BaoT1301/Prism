@@ -2,6 +2,7 @@
   "version": 1,
   "sandbox_type": "parameter_explorer",
   "visual_theme": "formula1",
+  "personal_scene": { "setting": "racetrack", "primary_prop": "race_car", "accent_props": ["camera", "headphones"], "mood": "neon", "label": "Your race-night pit lane" },
   "title": "Formula 1 Force Lab",
   "introduction": "Explore the force involved when a Formula 1 car accelerates out of a corner.",
   "formula_id": "force_equals_mass_times_acceleration",

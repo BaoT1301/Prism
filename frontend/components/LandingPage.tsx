@@ -1,3 +1,5 @@
+import { type PointerEvent, useRef } from "react";
+
 import { PrismBrand } from "./AppChrome";
 
 type LandingPageProps = {
@@ -34,6 +36,27 @@ const paths = [
 
 export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
   const enterLabel = isSignedIn ? "Open workspace" : "Enter Prism";
+  const heroArtRef = useRef<HTMLDivElement>(null);
+
+  function moveHero(event: PointerEvent<HTMLDivElement>) {
+    const element = heroArtRef.current;
+    if (!element || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const bounds = element.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) / bounds.width - 0.5;
+    const y = (event.clientY - bounds.top) / bounds.height - 0.5;
+    element.style.setProperty("--hero-tilt-x", `${x * 5}deg`);
+    element.style.setProperty("--hero-tilt-y", `${y * -5}deg`);
+    element.style.setProperty("--hero-shift-x", `${x * 10}px`);
+    element.style.setProperty("--hero-shift-y", `${y * 10}px`);
+  }
+
+  function resetHero() {
+    const element = heroArtRef.current;
+    element?.style.removeProperty("--hero-tilt-x");
+    element?.style.removeProperty("--hero-tilt-y");
+    element?.style.removeProperty("--hero-shift-x");
+    element?.style.removeProperty("--hero-shift-y");
+  }
 
   return (
     <main className="landing-page">
@@ -60,7 +83,7 @@ export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
           <p className="landing-proof"><span aria-hidden="true">✦</span> The context changes. The rigor never does.</p>
         </div>
 
-        <div className="prism-hero-art" aria-label="One physics objective branching into basketball, racing, and space learning experiences">
+        <div className="prism-hero-art" ref={heroArtRef} onPointerMove={moveHero} onPointerLeave={resetHero} aria-label="One physics objective branching into basketball, racing, and space learning experiences">
           <span className="hero-orbit orbit-outer" />
           <span className="hero-orbit orbit-inner" />
           <span className="hero-spark spark-one">✦</span>
@@ -92,7 +115,7 @@ export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
         <div className="landing-intro-copy">
           <p className="eyebrow">A better doorway into learning</p>
           <h2>Keep the destination.<br /><em>Change the way in.</em></h2>
-          <p>A teacher sets the learning objective once. Prism safely personalizes the scenario, language, and interactive lab for every student—so curiosity gets a head start.</p>
+          <p>A teacher sets the learning objective once. Prism safely personalizes the scenario, language, and interactive lab for every student, so curiosity gets a head start.</p>
         </div>
         <div className="landing-equation" aria-label="Objective plus interest becomes discovery">
           <div><span>01</span><strong>Objective</strong><small>The shared academic goal</small></div>
@@ -167,13 +190,13 @@ export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
         <article className="audience-teacher">
           <p className="eyebrow">For teachers</p>
           <h2>Your objective<br />stays the anchor.</h2>
-          <p>Create assignments, publish with confidence, and see how students are progressing—without building thirty versions of one lesson.</p>
+          <p>Create assignments, publish with confidence, and see how students are progressing without building thirty versions of one lesson.</p>
           <ul><li><span>01</span> One assignment to create</li><li><span>02</span> Clear completion visibility</li><li><span>03</span> No black-box grading</li></ul>
         </article>
         <article className="audience-student">
           <p className="eyebrow">For students</p>
           <h2>Start somewhere<br />you already belong.</h2>
-          <p>Step into familiar worlds, explore ideas with your hands, and get a nudge when you need one—not the answer handed to you.</p>
+          <p>Step into familiar worlds, explore ideas with your hands, and get a nudge when you need one, not the answer handed to you.</p>
           <div className="student-bubbles" aria-hidden="true"><span>curiosity</span><span>confidence</span><span>momentum</span></div>
         </article>
       </section>

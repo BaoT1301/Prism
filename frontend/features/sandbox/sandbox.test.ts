@@ -18,6 +18,13 @@ describe("sandbox contract", () => {
     expect(validateSandboxSpec(cachedSpec).mission).toBeUndefined();
   });
 
+  it("accepts only the finite personal-scene catalog", () => {
+    expect(validateSandboxSpec(basketball).personal_scene?.label).toBe("Your after-school court");
+    const unsafeScene: Record<string, unknown> = structuredClone(basketball);
+    (unsafeScene.personal_scene as Record<string, unknown>).setting = "private_home";
+    expect(() => validateSandboxSpec(unsafeScene)).toThrow("personal scene");
+  });
+
   it("calculates force only through the known formula registry", () => {
     expect(calculateFormula("force_equals_mass_times_acceleration", { mass: 0.6, acceleration: 8 })).toBe(4.8);
   });

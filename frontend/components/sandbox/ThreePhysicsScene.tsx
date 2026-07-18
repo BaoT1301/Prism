@@ -1,6 +1,7 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   BoxGeometry,
+  Color,
   ConeGeometry,
   CylinderGeometry,
   DirectionalLight,
@@ -18,7 +19,7 @@ import {
 } from "three";
 
 import { calculateFormula } from "../../features/sandbox/formula-registry";
-import type { SandboxSpec, VisualTheme } from "../../features/sandbox/sandbox-types";
+import type { PersonalScene, PersonalSceneProp, SandboxSpec, VisualTheme } from "../../features/sandbox/sandbox-types";
 
 type Props = {
   spec: SandboxSpec;
@@ -30,6 +31,56 @@ type Props = {
 
 function objectLabel(theme: VisualTheme): string {
   return { basketball: "Basketball", formula1: "Formula 1 car", space: "Rocket" }[theme];
+}
+
+function defaultPersonalScene(theme: VisualTheme): PersonalScene {
+  const defaults: Record<VisualTheme, PersonalScene> = {
+    basketball: { setting: "court", primary_prop: "basketball", accent_props: [], mood: "sunset", label: "Your court" },
+    formula1: { setting: "racetrack", primary_prop: "race_car", accent_props: [], mood: "neon", label: "Your pit lane" },
+    space: { setting: "launchpad", primary_prop: "rocket", accent_props: [], mood: "starlight", label: "Your launchpad" },
+  };
+  return defaults[theme];
+}
+
+const scenePalette = {
+  court: { floor: 0xd9ed66, sky: 0x2a2455 },
+  racetrack: { floor: 0x3d3a3d, sky: 0x1b1649 },
+  launchpad: { floor: 0x242338, sky: 0x10162f },
+  music_room: { floor: 0xe8c5ae, sky: 0x463257 },
+  gaming_desk: { floor: 0x24223e, sky: 0x15122c },
+  art_studio: { floor: 0xf1d5bd, sky: 0x6c5a98 },
+  city_park: { floor: 0x94c75f, sky: 0x5387a0 },
+  workshop: { floor: 0xb2a796, sky: 0x483f38 },
+} as const;
+
+function addPersonalProp(scene: Scene, prop: PersonalSceneProp, x: number, z: number, scale = 0.65) {
+  const group = new Group();
+  const ink = new MeshStandardMaterial({ color: 0x252124, roughness: 0.65 });
+  const coral = new MeshStandardMaterial({ color: 0xe86a36, roughness: 0.55 });
+  const paper = new MeshStandardMaterial({ color: 0xf6f0e3, roughness: 0.55 });
+  const lime = new MeshStandardMaterial({ color: 0xd9ed66, roughness: 0.7 });
+  if (prop === "basketball" || prop === "soccer_ball") group.add(new Mesh(new SphereGeometry(0.5, 20, 16), prop === "basketball" ? coral : paper));
+  if (prop === "race_car") group.add(new Mesh(new BoxGeometry(1.3, 0.26, 0.62), coral));
+  if (prop === "rocket") { const rocket = new Mesh(new ConeGeometry(0.35, 1.15, 16), paper); rocket.rotation.z = -Math.PI / 2; group.add(rocket); }
+  if (prop === "guitar") { group.add(new Mesh(new SphereGeometry(0.38, 16, 12), coral), new Mesh(new BoxGeometry(0.16, 1.1, 0.12), ink)); }
+  if (prop === "controller") group.add(new Mesh(new BoxGeometry(1.1, 0.28, 0.62), ink), new Mesh(new SphereGeometry(0.1, 12, 8), coral));
+  if (prop === "sketchbook") group.add(new Mesh(new BoxGeometry(0.88, 0.1, 1.08), paper), new Mesh(new BoxGeometry(0.05, 0.16, 1.08), coral));
+  if (prop === "camera") group.add(new Mesh(new BoxGeometry(0.9, 0.58, 0.42), ink), new Mesh(new CylinderGeometry(0.2, 0.2, 0.25, 16), paper));
+  if (prop === "skateboard") { group.add(new Mesh(new BoxGeometry(1.25, 0.09, 0.35), coral)); for (const wheelX of [-0.4, 0.4]) { const wheel = new Mesh(new CylinderGeometry(0.1, 0.1, 0.09, 12), ink); wheel.rotation.x = Math.PI / 2; wheel.position.x = wheelX; wheel.position.y = -0.12; group.add(wheel); } }
+  if (prop === "book_stack") { for (let index = 0; index < 3; index += 1) { const book = new Mesh(new BoxGeometry(0.86, 0.16, 0.58), index === 1 ? coral : index === 2 ? lime : paper); book.position.y = index * 0.17; group.add(book); } }
+  if (prop === "headphones") { const band = new Mesh(new TorusGeometry(0.38, 0.06, 8, 20, Math.PI), ink); band.rotation.z = Math.PI; group.add(band); for (const side of [-1, 1]) { const cup = new Mesh(new SphereGeometry(0.12, 12, 8), coral); cup.position.set(side * 0.36, -0.15, 0); group.add(cup); } }
+  if (prop === "plant") { const pot = new Mesh(new CylinderGeometry(0.23, 0.3, 0.34, 10), coral); pot.position.y = -0.15; group.add(pot); for (let index = 0; index < 4; index += 1) { const leaf = new Mesh(new ConeGeometry(0.16, 0.65, 8), lime); leaf.position.set((index - 1.5) * 0.12, 0.28, 0); leaf.rotation.z = (index - 1.5) * 0.35; group.add(leaf); } }
+  group.position.set(x, 0.42, z);
+  group.scale.setScalar(scale);
+  group.rotation.y = (x + z) * 0.4;
+  group.traverse((child) => { if (child instanceof Mesh) child.castShadow = true; });
+  scene.add(group);
+}
+
+function addPersonalComposition(scene: Scene, personalScene: PersonalScene) {
+  const props = [...new Set([personalScene.primary_prop, ...personalScene.accent_props])].slice(0, 3);
+  const placements: Array<[number, number, number]> = [[-2.7, 1.25, 0.58], [0.3, -1.45, 0.46], [2.4, 1.2, 0.42]];
+  props.forEach((prop, index) => addPersonalProp(scene, prop, ...placements[index]));
 }
 
 function addBasketballScene(scene: Scene): { moving: Group; targetX: number } {
@@ -109,6 +160,7 @@ export function ThreePhysicsScene({ spec, values, runToken, active, onAvailabili
   valuesRef.current = values;
   runTokenRef.current = runToken;
   const theme = spec.visual_theme ?? "basketball";
+  const personalScene = useMemo(() => spec.personal_scene ?? defaultPersonalScene(theme), [spec.personal_scene, theme]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -119,6 +171,8 @@ export function ThreePhysicsScene({ spec, values, runToken, active, onAvailabili
 
     try {
       const scene = new Scene();
+      const palette = scenePalette[personalScene.setting];
+      scene.background = new Color(palette.sky);
       const camera = new PerspectiveCamera(38, 1, 0.1, 100);
       camera.position.set(0, 3.2, 9.2);
       camera.lookAt(0.5, 0.8, 0);
@@ -131,13 +185,14 @@ export function ThreePhysicsScene({ spec, values, runToken, active, onAvailabili
       keyLight.position.set(-2, 5, 5);
       keyLight.castShadow = true;
       scene.add(keyLight);
-      const floor = new Mesh(new PlaneGeometry(12, 7), new MeshStandardMaterial({ color: 0xd9ed66, roughness: 0.9 }));
+      const floor = new Mesh(new PlaneGeometry(12, 7), new MeshStandardMaterial({ color: palette.floor, roughness: 0.9 }));
       floor.rotation.x = -Math.PI / 2;
       floor.receiveShadow = true;
       scene.add(floor);
 
       const sceneFactory = theme === "formula1" ? addFormulaScene : theme === "space" ? addSpaceScene : addBasketballScene;
       const { moving, targetX } = sceneFactory(scene);
+      addPersonalComposition(scene, personalScene);
       moving.position.set(-3.3, theme === "basketball" ? 0.65 : theme === "space" ? 1.2 : 0, 0);
       let lastRun = runTokenRef.current;
       let startedAt = performance.now();
@@ -184,10 +239,10 @@ export function ThreePhysicsScene({ spec, values, runToken, active, onAvailabili
         renderer.domElement.remove();
       }
     };
-  }, [onAvailability, spec.variables, theme]);
+  }, [onAvailability, personalScene, spec.variables, theme]);
 
   const force = calculateFormula(spec.formula_id, values);
   return <section className={`three-physics-scene ${active ? "is-active" : ""}`} ref={containerRef} aria-label={`${objectLabel(theme)} 3D physics visualization`}>
-    <div className="three-scene-label"><span>3D simulation</span><strong>{force.toFixed(2)} N</strong></div>
+    <div className="three-scene-label"><span>{personalScene.label}</span><strong>{force.toFixed(2)} N</strong></div>
   </section>;
 }

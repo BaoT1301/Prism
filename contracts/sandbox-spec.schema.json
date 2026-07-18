@@ -31,6 +31,80 @@
       ],
       "default": "basketball"
     },
+    "personal_scene": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "setting",
+        "primary_prop",
+        "accent_props",
+        "mood",
+        "label"
+      ],
+      "properties": {
+        "setting": {
+          "enum": [
+            "court",
+            "racetrack",
+            "launchpad",
+            "music_room",
+            "gaming_desk",
+            "art_studio",
+            "city_park",
+            "workshop"
+          ]
+        },
+        "primary_prop": {
+          "enum": [
+            "basketball",
+            "race_car",
+            "rocket",
+            "guitar",
+            "controller",
+            "sketchbook",
+            "soccer_ball",
+            "camera",
+            "skateboard",
+            "book_stack",
+            "headphones",
+            "plant"
+          ]
+        },
+        "accent_props": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "enum": [
+              "basketball",
+              "race_car",
+              "rocket",
+              "guitar",
+              "controller",
+              "sketchbook",
+              "soccer_ball",
+              "camera",
+              "skateboard",
+              "book_stack",
+              "headphones",
+              "plant"
+            ]
+          }
+        },
+        "mood": {
+          "enum": [
+            "daylight",
+            "sunset",
+            "neon",
+            "starlight"
+          ]
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        }
+      }
+    },
     "title": {
       "type": "string",
       "minLength": 1,

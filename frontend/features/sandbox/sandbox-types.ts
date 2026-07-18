@@ -1,6 +1,17 @@
 export type SandboxType = "parameter_explorer";
 export type FormulaId = "force_equals_mass_times_acceleration";
 export type VisualTheme = "basketball" | "formula1" | "space";
+export type PersonalSceneSetting = "court" | "racetrack" | "launchpad" | "music_room" | "gaming_desk" | "art_studio" | "city_park" | "workshop";
+export type PersonalSceneProp = "basketball" | "race_car" | "rocket" | "guitar" | "controller" | "sketchbook" | "soccer_ball" | "camera" | "skateboard" | "book_stack" | "headphones" | "plant";
+export type PersonalSceneMood = "daylight" | "sunset" | "neon" | "starlight";
+
+export interface PersonalScene {
+  setting: PersonalSceneSetting;
+  primary_prop: PersonalSceneProp;
+  accent_props: PersonalSceneProp[];
+  mood: PersonalSceneMood;
+  label: string;
+}
 
 export interface SandboxVariable {
   id: string;
@@ -79,6 +90,8 @@ export interface SandboxSpec {
   version: 1;
   sandbox_type: SandboxType;
   visual_theme?: VisualTheme;
+  /** AI-selected composition from the finite renderer-owned 3D catalog. */
+  personal_scene?: PersonalScene;
   title: string;
   introduction: string;
   formula_id: FormulaId;

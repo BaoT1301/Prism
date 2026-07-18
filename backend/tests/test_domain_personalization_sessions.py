@@ -85,6 +85,8 @@ def test_fixture_generation_is_valid_cached_and_session_safe(domain_db):
     generated, session, cache = provider.start(db, assignment, student, interests)
     assert cache == "miss" and generated.sandbox_spec["sandbox_type"] == "parameter_explorer"
     assert generated.reflection_questions == generated.sandbox_spec["reflection_questions"]
+    assert generated.sandbox_spec["personal_scene"]["primary_prop"] == "basketball"
+    assert FixturePersonalizationProvider._personal_scene("music production", "basketball")["primary_prop"] == "guitar"
     assert provider.start(db, assignment, student, interests)[2] == "hit"
     cached_content = asyncio.run(FixturePersonalizationProvider().generate(assignment, interests))
     cached_content.sandbox_spec.pop("mission")
