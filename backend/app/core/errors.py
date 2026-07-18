@@ -10,7 +10,11 @@ class ApiError(HTTPException):
 
 
 def error_response(request: Request, status_code: int, code: str, message: str) -> JSONResponse:
-    return JSONResponse(status_code=status_code, content={"error": {"code": code, "message": message, "request_id": getattr(request.state, "request_id", None)}})
+    request_id = getattr(request.state, "request_id", None)
+    response = JSONResponse(status_code=status_code, content={"error": {"code": code, "message": message, "request_id": request_id}})
+    if request_id:
+        response.headers["X-Request-ID"] = request_id
+    return response
 
 
 def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:

@@ -1,7 +1,7 @@
 import type { HintResponse, ProgressRequest, ProgressResponse, ReflectionAnswer, SandboxLaunch, SandboxSession, StartAssignmentResponse, SubmissionResponse } from "../../features/sandbox/sandbox-types";
 
 export class SandboxApiError extends Error {
-  constructor(public readonly status: number, public readonly code: string, message: string) {
+  constructor(public readonly status: number, public readonly code: string, message: string, public readonly requestId?: string) {
     super(message);
     this.name = "SandboxApiError";
   }
@@ -22,8 +22,15 @@ async function request<T>(baseUrl: string, path: string, init: RequestInit = {})
     headers: { "Content-Type": "application/json", ...(init.headers ?? {}) },
   });
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
-    throw new SandboxApiError(response.status, body?.error?.code ?? "REQUEST_FAILED", body?.error?.message ?? "Sandbox request failed.");
+    const body = (await response.json().catch(() => null)) as { error?: { code?: string; message?: string; request_id?: string } } | null;
+    const requestId = body?.error?.request_id ?? response.headers.get("X-Request-ID") ?? undefined;
+    const message = body?.error?.message ?? "Sandbox request failed.";
+    throw new SandboxApiError(
+      response.status,
+      body?.error?.code ?? "REQUEST_FAILED",
+      requestId ? `${message} Reference: ${requestId}` : message,
+      requestId,
+    );
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;

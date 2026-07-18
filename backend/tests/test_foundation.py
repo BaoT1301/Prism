@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 
 import pytest
@@ -23,6 +24,29 @@ def test_health_success(client):
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
     assert response.headers["X-Request-ID"]
+
+
+def test_unhandled_errors_are_logged_with_request_correlation(caplog):
+    app = create_app(Settings(environment="test", _env_file=None))
+
+    @app.get("/_test/unhandled-error")
+    def unhandled_error() -> None:
+        raise RuntimeError("intentional test failure")
+
+    from fastapi.testclient import TestClient
+
+    caplog.set_level(logging.ERROR, logger="app.error")
+    with TestClient(app, raise_server_exceptions=False) as test_client:
+        response = test_client.get("/_test/unhandled-error", headers={"X-Request-ID": "req-test-500"})
+
+    assert response.status_code == 500
+    assert response.json()["error"] == {
+        "code": "INTERNAL_ERROR",
+        "message": "An unexpected error occurred.",
+        "request_id": "req-test-500",
+    }
+    assert response.headers["X-Request-ID"] == "req-test-500"
+    assert "route=/_test/unhandled-error request_id=req-test-500 exception_type=RuntimeError" in caplog.text
 
 
 def test_openapi_generation(client):
