@@ -84,5 +84,21 @@ export function validateSandboxSpec(value: unknown): SandboxSpec {
       if (check.question_id && !questionIds.has(check.question_id)) throw new Error("Completion check references an unknown question.");
     }
   }
+  const mission = candidate.mission;
+  if (!mission || mission.schema_version !== "1.0" || mission.evaluator_version !== "numeric-v1") throw new Error("Sandbox mission is invalid.");
+  if (!mission.title || !mission.context || !mission.objective || !mission.template_id) throw new Error("Sandbox mission content is incomplete.");
+  if (!Array.isArray(mission.controls) || mission.controls.length === 0 || mission.controls.some((control) => !variableIds.has(control.variable_id))) throw new Error("Mission controls reference unknown variables.");
+  if (!Array.isArray(mission.calculated_outputs) || !mission.calculated_outputs.some((output) => output.id === "force" && output.formula_id === candidate.formula_id)) throw new Error("Mission outputs are invalid.");
+  if (!Array.isArray(mission.visible_constraints) || mission.visible_constraints.length === 0) throw new Error("Mission constraints are required.");
+  const constraintIds = new Set<string>();
+  for (const constraint of mission.visible_constraints) {
+    if (!constraint.id || constraintIds.has(constraint.id) || !constraint.label || !variableIds.has(constraint.field) && constraint.field !== "force") throw new Error("Mission constraint reference is invalid.");
+    constraintIds.add(constraint.id);
+    if (!["greater_than_or_equal", "less_than_or_equal", "between"].includes(constraint.operator)) throw new Error("Mission constraint operator is unsupported.");
+    if (constraint.operator === "between" && (typeof constraint.min !== "number" || typeof constraint.max !== "number" || constraint.min > constraint.max)) throw new Error("Mission constraint range is invalid.");
+    if (constraint.operator !== "between" && typeof constraint.value !== "number") throw new Error("Mission constraint threshold is invalid.");
+  }
+  if (mission.success_condition?.operator !== "AND" || !mission.success_condition.constraint_ids.length || mission.success_condition.constraint_ids.some((id) => !constraintIds.has(id))) throw new Error("Mission success condition is invalid.");
+  if (!mission.bonus_condition || mission.bonus_condition.type !== "distinct_second_solution") throw new Error("Mission bonus condition is invalid.");
   return { ...candidate, reflection_questions: questions } as SandboxSpec;
 }

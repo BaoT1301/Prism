@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { PrismBrand } from "../../components/AppChrome";
 import { CompletionScreen } from "../../components/sandbox/CompletionScreen";
-import { GuidedSteps } from "../../components/sandbox/GuidedSteps";
 import { HintPanel } from "../../components/sandbox/HintPanel";
 import { PhysicsScene } from "../../components/sandbox/PhysicsScene";
 import { ReflectionForm } from "../../components/sandbox/ReflectionForm";
@@ -11,7 +10,8 @@ import { VariableSlider } from "../../components/sandbox/VariableSlider";
 import { SandboxApiError, type SandboxApi } from "../../lib/sandbox/sandbox-api";
 import { mergeCompletedStepIds } from "./completion";
 import { calculateFormula } from "./formula-registry";
-import { buildProgressRequest, progressPercentage } from "./progress";
+import { evaluateMission } from "./mission";
+import { buildProgressRequest } from "./progress";
 import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec } from "./sandbox-types";
 
 export function ParameterExplorer({
@@ -39,14 +39,16 @@ export function ParameterExplorer({
     initialSession.status === "submitted" ? initialSession.submitted_at : undefined,
   );
   const [runToken, setRunToken] = useState(0);
+  const [lastRunAt, setLastRunAt] = useState(() => Date.now());
+  const [firstSolution, setFirstSolution] = useState<Record<string, number> | undefined>();
+  const [bonusAttempted, setBonusAttempted] = useState(false);
   const firstRender = useRef(true);
   const sessionRef = useRef(initialSession);
   const saveGenerationRef = useRef(0);
   sessionRef.current = session;
   const result = useMemo(() => calculateFormula(spec.formula_id, values), [spec.formula_id, values]);
-  const automaticIds = useMemo(() => spec.guided_steps.filter((step) => (step.completion_checks?.length ?? 0) > 0).map((step) => step.id), [spec]);
-  const percentage = progressPercentage(spec.guided_steps, completedStepIds);
-  const missionComplete = percentage === 100;
+  const missionEvaluation = evaluateMission(spec, values);
+  const missionComplete = missionEvaluation.complete || Boolean(session.mission_evaluation?.complete);
 
   useEffect(() => {
     setCompletedStepIds((current) => {
@@ -94,7 +96,7 @@ export function ParameterExplorer({
     setSubmitError(undefined);
     try {
       const submission = await api.submit(session.id, session.version, reflectionAnswers);
-      setSession((current) => ({ ...current, status: "submitted", submitted_at: submission.submitted_at }));
+      setSession((current) => ({ ...current, status: "submitted", submitted_at: submission.submitted_at, feedback: submission.feedback }));
       setSubmittedAt(submission.submitted_at);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to complete this mission.");
@@ -103,8 +105,33 @@ export function ParameterExplorer({
     }
   }
 
+  async function runExperiment() {
+    const now = Date.now();
+    const evaluation = evaluateMission(spec, values);
+    if (evaluation.complete && !firstSolution) setFirstSolution(values);
+    const event = {
+      event_type: "experiment_run" as const,
+      recorded_at: new Date(now).toISOString(),
+      elapsed_ms: now - lastRunAt,
+      values,
+      mission_complete: evaluation.complete,
+      bonus_attempted: Boolean(firstSolution),
+      controlled_comparison: true,
+    };
+    try {
+      const latest = await api.updateProgress(session.id, buildProgressRequest(session, completedStepIds, values, reflectionAnswers, event));
+      setSession((current) => ({ ...current, ...latest, mission_evaluation: evaluation }));
+      sessionRef.current = { ...sessionRef.current, ...latest };
+      setLastRunAt(now);
+      if (firstSolution && evaluation.complete && (Math.abs((firstSolution.mass ?? 0) - (values.mass ?? 0)) >= (spec.mission.bonus_condition.minimum_difference?.mass ?? 0) || Math.abs((firstSolution.acceleration ?? 0) - (values.acceleration ?? 0)) >= (spec.mission.bonus_condition.minimum_difference?.acceleration ?? 0))) setBonusAttempted(true);
+      setRunToken((token) => token + 1);
+    } catch (error) {
+      setSaveStatus(error instanceof SandboxApiError && error.status === 409 ? "conflict" : "error");
+    }
+  }
+
   if (submittedAt) {
-    return <CompletionScreen title={spec.title} completedSteps={completedStepIds.length} totalSteps={spec.guided_steps.length} hintsUsed={session.hints_used} submittedAt={submittedAt} onExit={onExit} />;
+    return <CompletionScreen title={spec.title} completedSteps={completedStepIds.length} totalSteps={spec.guided_steps.length} hintsUsed={session.hints_used} submittedAt={submittedAt} feedback={session.feedback} onExit={onExit} />;
   }
 
   return (
@@ -116,12 +143,13 @@ export function ParameterExplorer({
       <main className="sandbox-main">
         <section className="mission-hero">
           <div><p className="eyebrow">Experiment 01 · Parameter explorer</p><h1>{spec.title}</h1><p className="mission-intro">{spec.introduction}</p></div>
-          <div className="mission-status"><span className="status-dot" />{session.status === "submitted" ? "Mission complete" : `${percentage}% explored`}</div>
+          <div className="mission-status"><span className="status-dot" />{missionComplete ? "Mission complete" : "Mission in progress"}</div>
         </section>
 
         <div className="sandbox-dashboard">
           <div className="simulation-column">
             <PhysicsScene spec={spec} values={values} runToken={runToken} />
+            <button className="primary-button mission-run-button" type="button" onClick={() => void runExperiment()}>Run and record experiment</button>
             <div className="simulation-action"><div><p className="card-kicker">Ready when you are</p><strong>Change a variable, then run the experiment.</strong></div><button className="primary-button" type="button" onClick={() => setRunToken((token) => token + 1)}>Run experiment <span aria-hidden="true">→</span></button></div>
           </div>
           <aside className="coach-column">
@@ -138,9 +166,10 @@ export function ParameterExplorer({
         </section>
 
         <section className="mission-card">
-          <div className="section-heading"><div><p className="card-kicker">Mission progress</p><h2>Complete the checklist.</h2></div><strong className="progress-label">{percentage}%</strong></div>
-          <div className="progress-track"><span style={{ width: `${percentage}%` }} /></div>
-          <GuidedSteps steps={spec.guided_steps} completedStepIds={completedStepIds} automaticStepIds={automaticIds} onToggle={(id) => setCompletedStepIds((current) => current.includes(id) ? current.filter((stepId) => stepId !== id) : [...current, id])} />
+          <div className="section-heading"><div><p className="card-kicker">Mission progress</p><h2>{spec.mission.title}</h2></div><strong className="progress-label">{missionComplete ? "Complete" : "In progress"}</strong></div>
+          <p className="mission-context">{spec.mission.context}</p>
+          <div className="mission-constraints">{missionEvaluation.constraints.map((constraint) => <div className={constraint.satisfied ? "constraint is-satisfied" : "constraint"} key={constraint.id}><span aria-hidden="true">{constraint.satisfied ? "✓" : "○"}</span><div><strong>{constraint.label}</strong><small>{constraint.current_value === null ? "Run an experiment to see the current value." : `${constraint.current_value} · ${constraint.message}`}</small></div></div>)}</div>
+          {missionComplete && spec.mission.bonus_condition.enabled && <div className="bonus-panel"><strong>Optional extension</strong><p>{spec.mission.bonus_condition.description}</p>{bonusAttempted && <small>Second valid solution recorded.</small>}</div>}
         </section>
 
         <ReflectionForm questions={spec.reflection_questions} answers={reflectionAnswers} onChange={setReflectionAnswers} />

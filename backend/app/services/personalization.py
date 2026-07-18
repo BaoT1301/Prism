@@ -17,6 +17,7 @@ from app.core.config import Settings
 from app.core.errors import ApiError
 from app.models.models import Assignment, GeneratedAssignment, GenerationStatus, InterestProfile, Profile, SandboxSession
 from app.schemas.personalization import GeneratedContent, ReflectionQuestion
+from app.services.mission import validate_mission
 
 CONTRACT_PATH = Path(__file__).parents[3] / "contracts" / "sandbox-spec.schema.json"
 SANDBOX_SCHEMA = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
@@ -80,18 +81,24 @@ class FixturePersonalizationProvider:
     prompt_version = "fixture-v1"
     async def generate(self, assignment: Assignment, interests: InterestProfile) -> GeneratedContent:
         theme = (interests.sports + interests.games + interests.hobbies + interests.additional_interests or ["science"])[0]
+        visual_theme = self._theme(theme)
+        context, mass_label, acceleration_label, template_id = {
+            "basketball": ("Basketball", "Ball mass setting", "Pass acceleration setting", "basketball-force-v1"),
+            "formula1": ("Formula 1", "Vehicle mass setting", "Acceleration setting", "formula1-force-v1"),
+            "space": ("Space", "Payload mass setting", "Launch acceleration setting", "space-force-v1"),
+        }[visual_theme]
         return GeneratedContent(
-            personalized_title=f"{theme.title()} Force Lab",
-            scenario=f"Explore Newton's Second Law through a {theme} scenario.",
-            problem_statement="Adjust mass and acceleration, then observe the force required.",
+            personalized_title=f"{context} Force Mission",
+            scenario=f"Explore Newton's Second Law through a normalized {context.lower()} model.",
+            problem_statement="Adjust the mass and acceleration settings to produce a target force while meeting every constraint.",
             learning_objective=assignment.learning_objective,
-            instructions=["Set a mass.", "Set an acceleration.", "Compare the resulting force."],
-            reflection_questions=[ReflectionQuestion(id="reflection-1", question="How did changing acceleration affect force?")],
+            instructions=["Read the mission constraints.", "Run experiments with mass and acceleration.", "Find one valid configuration and explain the pattern."],
+            reflection_questions=[ReflectionQuestion(id="reflection-1", question="How did changing acceleration affect force while mass stayed constant?")],
             sandbox_spec={
-                "version": 1, "sandbox_type": "parameter_explorer", "visual_theme": self._theme(theme), "title": f"{theme.title()} Force Lab",
-                "introduction": f"Use this {theme} scenario to explore force.", "formula_id": "force_equals_mass_times_acceleration",
+                "version": 1, "sandbox_type": "parameter_explorer", "visual_theme": visual_theme, "title": f"{context} Force Mission",
+                "introduction": f"Use this normalized {context.lower()} scenario to explore force.", "formula_id": "force_equals_mass_times_acceleration",
                 "variables": [
-                    {"id": "mass", "label": "Mass", "unit": "kg", "min": 0.1, "max": 10, "step": 0.1, "default": 1, "editable": True},
+                    {"id": "mass", "label": mass_label, "unit": "normalized units", "min": 0.1, "max": 10, "step": 0.1, "default": 1, "editable": True},
                     {"id": "acceleration", "label": "Acceleration", "unit": "m/s²", "min": 0, "max": 20, "step": 1, "default": 5, "editable": True},
                 ],
                 "guided_steps": [
@@ -101,6 +108,21 @@ class FixturePersonalizationProvider:
                 ],
                 "completion_rules": [{"type": "all_steps_completed"}],
                 "reflection_questions": [{"id": "reflection-1", "question": "How did changing acceleration affect force?"}],
+                "mission": {
+                    "schema_version": "1.0", "evaluator_version": "numeric-v1", "template_id": template_id,
+                    "title": f"{context} Force Mission",
+                    "context": f"Prepare the normalized {context.lower()} model for its final challenge.",
+                    "objective": "Produce the required force while staying within the visible mass and acceleration limits.",
+                    "controls": [{"variable_id": "mass"}, {"variable_id": "acceleration"}],
+                    "calculated_outputs": [{"id": "force", "label": "Calculated force", "formula_id": "force_equals_mass_times_acceleration", "unit": "N"}],
+                    "visible_constraints": [
+                        {"id": "mass-min", "label": "Mass setting stays in range", "field": "mass", "operator": "greater_than_or_equal", "value": 0.5},
+                        {"id": "acceleration-limit", "label": "Acceleration stays within the safe limit", "field": "acceleration", "operator": "less_than_or_equal", "value": 12},
+                        {"id": "force-target", "label": "Calculated force reaches the mission target", "field": "force", "operator": "between", "min": 4, "max": 12},
+                    ],
+                    "success_condition": {"operator": "AND", "constraint_ids": ["mass-min", "acceleration-limit", "force-target"]},
+                    "bonus_condition": {"enabled": True, "type": "distinct_second_solution", "description": "Find another valid mass and acceleration combination.", "minimum_difference": {"mass": 0.5, "acceleration": 1}},
+                },
             },
         )
 
@@ -154,6 +176,10 @@ class PersonalizationService:
         errors = list(Draft202012Validator(SANDBOX_SCHEMA).iter_errors(content.sandbox_spec))
         if errors:
             raise ApiError(502, "INVALID_AI_OUTPUT", "Generated sandbox configuration is invalid.")
+        try:
+            validate_mission(content.sandbox_spec)
+        except ValueError as exc:
+            raise ApiError(502, "INVALID_AI_OUTPUT", "Generated mission configuration is invalid.") from exc
         sandbox_questions = content.sandbox_spec.get("reflection_questions", [])
         if [question.model_dump() for question in content.reflection_questions] != sandbox_questions:
             raise ApiError(502, "INVALID_AI_OUTPUT", "Generated reflection questions do not match the sandbox configuration.")

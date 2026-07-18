@@ -1,3 +1,5 @@
+import type { AdaptiveFeedback } from "../../features/sandbox/sandbox-types";
+
 export function CompletionScreen({
   title,
   completedSteps,
@@ -5,6 +7,7 @@ export function CompletionScreen({
   hintsUsed,
   submittedAt,
   onExit,
+  feedback,
 }: {
   title: string;
   completedSteps: number;
@@ -12,6 +15,7 @@ export function CompletionScreen({
   hintsUsed: number;
   submittedAt: string;
   onExit?: () => void;
+  feedback?: AdaptiveFeedback;
 }) {
   const submittedLabel = new Intl.DateTimeFormat(undefined, {
     dateStyle: "medium",
@@ -31,6 +35,7 @@ export function CompletionScreen({
           <div><strong>✓</strong><span>Work submitted</span></div>
         </div>
         <p className="submission-note">Submitted {submittedLabel}. Your teacher can now see that this mission is complete.</p>
+        {feedback && <section className="feedback-card"><p className="eyebrow">Your learning feedback</p><h2>{feedback.concepts_mastered.length ? "You made the connection." : "Keep exploring the pattern."}</h2><p>{feedback.explanation}</p>{feedback.areas_of_confusion.length > 0 && <p><strong>Next focus:</strong> {feedback.areas_of_confusion.join(" ")}</p>}<p><strong>Try next:</strong> {feedback.follow_up_practice}</p></section>}
         {onExit && <button type="button" onClick={onExit}>Back to learning <span aria-hidden="true">→</span></button>}
       </section>
     </main>

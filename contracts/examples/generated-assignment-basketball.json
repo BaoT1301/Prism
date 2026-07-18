@@ -79,6 +79,21 @@
         "id": "reflection-1",
         "question": "What happens to force when acceleration increases while mass stays constant?"
       }
-    ]
+    ],
+    "mission": {
+      "schema_version": "1.0", "evaluator_version": "numeric-v1", "template_id": "basketball-force-v1",
+      "title": "Make the Game-Winning Pass",
+      "context": "Use the normalized basketball model to prepare the game-winning pass.",
+      "objective": "Produce the target force while keeping the pass settings within the visible limits.",
+      "controls": [{ "variable_id": "mass" }, { "variable_id": "acceleration" }],
+      "calculated_outputs": [{ "id": "force", "label": "Calculated force", "formula_id": "force_equals_mass_times_acceleration", "unit": "N" }],
+      "visible_constraints": [
+        { "id": "mass-range", "label": "Ball mass stays realistic", "field": "mass", "operator": "between", "min": 0.55, "max": 0.75 },
+        { "id": "acceleration-limit", "label": "Pass acceleration stays controlled", "field": "acceleration", "operator": "less_than_or_equal", "value": 10 },
+        { "id": "force-target", "label": "Calculated force reaches the target", "field": "force", "operator": "between", "min": 4.5, "max": 5.2 }
+      ],
+      "success_condition": { "operator": "AND", "constraint_ids": ["mass-range", "acceleration-limit", "force-target"] },
+      "bonus_condition": { "enabled": true, "type": "distinct_second_solution", "description": "Find another valid mass and acceleration combination.", "minimum_difference": { "mass": 0.05, "acceleration": 1 } }
+    }
   }
 }

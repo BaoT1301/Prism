@@ -22,6 +22,7 @@ class ProgressRequest(BaseModel):
     completed_step_ids: list[str] = Field(max_length=8)
     responses: dict[str, Any] = Field(default_factory=dict)
     reflection_answers: list[ReflectionAnswer] = Field(default_factory=list, max_length=5)
+    experiment_event: dict[str, Any] | None = None
 
 
 class HintRequest(BaseModel):
@@ -44,6 +45,9 @@ class SandboxSessionResponse(BaseModel):
     hints_used: int = Field(ge=0)
     submitted_at: datetime | None
     updated_at: datetime
+    mission_evaluation: dict[str, Any] | None = None
+    interaction_events: list[dict[str, Any]] = Field(default_factory=list)
+    feedback: dict[str, Any] | None = None
 
 
 class HintResponse(BaseModel):
@@ -58,6 +62,7 @@ class SubmissionResponse(BaseModel):
     student_id: uuid.UUID
     status: str
     submitted_at: datetime
+    feedback: dict[str, Any] | None = None
 
 
 class SubmissionSummaryResponse(BaseModel):
@@ -81,6 +86,7 @@ class AssignmentProgressResponse(BaseModel):
     total_steps: int = Field(ge=0)
     hints_used: int = Field(ge=0)
     submitted_at: datetime | None
+    feedback: dict[str, Any] | None = None
 
 
 class AssignmentProgressListResponse(BaseModel):

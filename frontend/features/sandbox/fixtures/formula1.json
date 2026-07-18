@@ -15,5 +15,20 @@
     { "id": "step-3", "instruction": "Explain how mass and acceleration affect force.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
   ],
   "completion_rules": [{ "type": "all_steps_completed" }],
-  "reflection_questions": [{ "id": "reflection-1", "question": "How does acceleration affect the force on the car?" }]
+  "reflection_questions": [{ "id": "reflection-1", "question": "How does acceleration affect the force on the car?" }],
+  "mission": {
+    "schema_version": "1.0", "evaluator_version": "numeric-v1", "template_id": "formula1-force-v1",
+    "title": "Prepare the Qualifying Run",
+    "context": "Use the normalized vehicle model to prepare for a qualifying run.",
+    "objective": "Produce the target force while keeping the vehicle settings within the visible limits.",
+    "controls": [{ "variable_id": "mass" }, { "variable_id": "acceleration" }],
+    "calculated_outputs": [{ "id": "force", "label": "Calculated force", "formula_id": "force_equals_mass_times_acceleration", "unit": "N" }],
+    "visible_constraints": [
+      { "id": "mass-range", "label": "Vehicle mass setting stays legal", "field": "mass", "operator": "between", "min": 780, "max": 850 },
+      { "id": "acceleration-limit", "label": "Acceleration stays below the limit", "field": "acceleration", "operator": "less_than_or_equal", "value": 12 },
+      { "id": "force-target", "label": "Calculated force reaches the target", "field": "force", "operator": "between", "min": 9000, "max": 9800 }
+    ],
+    "success_condition": { "operator": "AND", "constraint_ids": ["mass-range", "acceleration-limit", "force-target"] },
+    "bonus_condition": { "enabled": true, "type": "distinct_second_solution", "description": "Find another valid mass and acceleration combination.", "minimum_difference": { "mass": 10, "acceleration": 0.5 } }
+  }
 }

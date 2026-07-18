@@ -15,5 +15,20 @@
     { "id": "step-3", "instruction": "Explain the relationship among mass, acceleration, and force.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
   ],
   "completion_rules": [{ "type": "all_steps_completed" }],
-  "reflection_questions": [{ "id": "reflection-1", "question": "Why does increasing acceleration increase the required force?" }]
+  "reflection_questions": [{ "id": "reflection-1", "question": "Why does increasing acceleration increase the required force?" }],
+  "mission": {
+    "schema_version": "1.0", "evaluator_version": "numeric-v1", "template_id": "space-force-v1",
+    "title": "Prepare the Launch",
+    "context": "Use the normalized payload model to prepare a controlled launch.",
+    "objective": "Produce the target force while staying within the visible launch limits.",
+    "controls": [{ "variable_id": "mass" }, { "variable_id": "acceleration" }],
+    "calculated_outputs": [{ "id": "force", "label": "Calculated force", "formula_id": "force_equals_mass_times_acceleration", "unit": "N" }],
+    "visible_constraints": [
+      { "id": "mass-range", "label": "Payload mass setting stays within limits", "field": "mass", "operator": "between", "min": 400, "max": 700 },
+      { "id": "acceleration-limit", "label": "Launch acceleration stays controlled", "field": "acceleration", "operator": "less_than_or_equal", "value": 12 },
+      { "id": "force-target", "label": "Calculated force reaches the target", "field": "force", "operator": "between", "min": 4000, "max": 7000 }
+    ],
+    "success_condition": { "operator": "AND", "constraint_ids": ["mass-range", "acceleration-limit", "force-target"] },
+    "bonus_condition": { "enabled": true, "type": "distinct_second_solution", "description": "Find another valid mass and acceleration combination.", "minimum_difference": { "mass": 10, "acceleration": 1 } }
+  }
 }

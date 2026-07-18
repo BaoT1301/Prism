@@ -1,4 +1,4 @@
-import type { GuidedStep, ProgressRequest, ReflectionAnswer, SandboxSession } from "./sandbox-types";
+import type { GuidedStep, InteractionEvent, ProgressRequest, ReflectionAnswer, SandboxSession } from "./sandbox-types";
 
 export function progressPercentage(steps: GuidedStep[], completedStepIds: string[]): number {
   if (steps.length === 0) return 0;
@@ -7,6 +7,6 @@ export function progressPercentage(steps: GuidedStep[], completedStepIds: string
   return Math.round((completed.size / steps.length) * 100);
 }
 
-export function buildProgressRequest(session: SandboxSession, completedStepIds: string[], responses: Record<string, number>, reflectionAnswers: ReflectionAnswer[]): ProgressRequest {
-  return { expected_version: session.version, completed_step_ids: completedStepIds, responses, reflection_answers: reflectionAnswers };
+export function buildProgressRequest(session: SandboxSession, completedStepIds: string[], responses: Record<string, number>, reflectionAnswers: ReflectionAnswer[], experimentEvent?: InteractionEvent): ProgressRequest {
+  return { expected_version: session.version, completed_step_ids: completedStepIds, responses, reflection_answers: reflectionAnswers, ...(experimentEvent ? { experiment_event: experimentEvent } : {}) };
 }

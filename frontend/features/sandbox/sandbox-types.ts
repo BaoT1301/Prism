@@ -42,6 +42,39 @@ export interface ReflectionQuestion {
   question: string;
 }
 
+export type MissionOperator = "greater_than_or_equal" | "less_than_or_equal" | "between";
+
+export interface MissionConstraint {
+  id: string;
+  label: string;
+  field: string;
+  operator: MissionOperator;
+  value?: number;
+  min?: number;
+  max?: number;
+}
+
+export interface MissionEvaluation {
+  complete: boolean;
+  outputs: Record<string, number>;
+  constraints: Array<{ id: string; label: string; satisfied: boolean; current_value: number | null; message: string }>;
+  bonus: { enabled: boolean; complete: boolean; attempted: boolean };
+}
+
+export interface SandboxMission {
+  schema_version: "1.0";
+  evaluator_version: "numeric-v1";
+  template_id: string;
+  title: string;
+  context: string;
+  objective: string;
+  controls: Array<{ variable_id: string }>;
+  calculated_outputs: Array<{ id: string; label: string; formula_id: FormulaId; unit: string }>;
+  visible_constraints: MissionConstraint[];
+  success_condition: { operator: "AND"; constraint_ids: string[] };
+  bonus_condition: { enabled: boolean; type: "distinct_second_solution"; description: string; minimum_difference?: Record<string, number> };
+}
+
 export interface SandboxSpec {
   version: 1;
   sandbox_type: SandboxType;
@@ -53,6 +86,7 @@ export interface SandboxSpec {
   guided_steps: GuidedStep[];
   completion_rules: CompletionRule[];
   reflection_questions: ReflectionQuestion[];
+  mission: SandboxMission;
 }
 
 export interface SandboxSession {
@@ -65,6 +99,30 @@ export interface SandboxSession {
   hints_used: number;
   updated_at?: string;
   submitted_at?: string;
+  mission_evaluation?: MissionEvaluation;
+  interaction_events?: InteractionEvent[];
+  feedback?: AdaptiveFeedback;
+}
+
+export interface InteractionEvent {
+  event_type: "experiment_run" | "hint_requested";
+  recorded_at: string;
+  elapsed_ms?: number;
+  values?: Record<string, number>;
+  outputs?: Record<string, number>;
+  mission_complete?: boolean;
+  controlled_comparison?: boolean;
+  bonus_attempted?: boolean;
+}
+
+export interface AdaptiveFeedback {
+  status: "pending" | "ready" | "failed";
+  concepts_mastered: string[];
+  areas_of_confusion: string[];
+  explanation: string;
+  recommended_next_steps: string[];
+  follow_up_practice: string;
+  teacher_summary?: Record<string, unknown>;
 }
 
 export interface StartAssignmentResponse {
@@ -96,6 +154,7 @@ export interface ProgressRequest {
   completed_step_ids: string[];
   responses: Record<string, number>;
   reflection_answers: ReflectionAnswer[];
+  experiment_event?: InteractionEvent;
 }
 
 export interface ProgressResponse extends SandboxSession {
@@ -114,6 +173,7 @@ export interface SubmissionResponse {
   student_id: string;
   status: "submitted";
   submitted_at: string;
+  feedback?: AdaptiveFeedback;
 }
 
 export interface ReflectionAnswer {
