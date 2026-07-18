@@ -1,3 +1,4 @@
 export function SaveStatus({ status, message }: { status: "idle" | "saving" | "saved" | "error" | "conflict"; message?: string }) {
-  return <p role="status">{message ?? ({ idle: "Not changed", saving: "Saving…", saved: "Saved", error: "Unable to save progress", conflict: "Progress changed elsewhere; latest version loaded" }[status])}</p>;
+  const labels = { idle: "Ready", saving: "Saving...", saved: "Progress saved", error: "Unable to save progress", conflict: "Latest progress loaded" };
+  return <p className={`save-status status-${status}`} role="status"><span aria-hidden="true" />{message ?? labels[status]}</p>;
 }

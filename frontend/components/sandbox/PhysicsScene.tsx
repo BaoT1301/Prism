@@ -31,6 +31,13 @@ export function PhysicsScene({ spec, values, runToken }: { spec: SandboxSpec; va
   useEffect(() => {
     if (runToken === 0) return;
 
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      positionRef.current = targetPosition;
+      setObjectPosition(targetPosition);
+      setIsRunning(false);
+      return;
+    }
+
     if (animationFrameRef.current !== undefined) window.cancelAnimationFrame(animationFrameRef.current);
     const startPosition = positionRef.current;
     const startTime = performance.now();

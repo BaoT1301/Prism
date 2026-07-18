@@ -9,8 +9,9 @@ from sqlalchemy.exc import IntegrityError
 from app.api.dependencies.auth import get_student, get_teacher
 from app.core.config import Settings
 from app.main import create_app
-from app.models.models import Class, Profile, UserRole
+from app.models.models import Class, Profile, SandboxSession, UserRole
 from app.schemas.personalization import GeneratedContent
+from app.services.personalization import OPENAI_RESPONSE_SCHEMA
 
 
 def auth(token: str = "valid") -> dict[str, str]:
@@ -32,7 +33,8 @@ def test_openapi_generation(client):
     class_schema = document["components"]["schemas"]["ClassResponse"]
     assert {"student_count", "assignment_count"}.issubset(class_schema["properties"])
     session_schema = document["components"]["schemas"]["SandboxSessionResponse"]
-    assert "reflection_answers" in session_schema["properties"]
+    assert {"reflection_answers", "submitted_at"}.issubset(session_schema["properties"])
+    assert "/api/v1/assignments/{assignment_id}/progress" in document["paths"]
 
 
 def test_generated_assignment_example_matches_the_persisted_contract():
@@ -42,6 +44,30 @@ def test_generated_assignment_example_matches_the_persisted_contract():
     generated = GeneratedContent.model_validate(example)
     Draft202012Validator(schema).validate(generated.sandbox_spec)
     assert [question.model_dump() for question in generated.reflection_questions] == generated.sandbox_spec["reflection_questions"]
+
+
+def test_openai_response_schema_is_strict_at_every_object():
+    assert "provider_response_id" not in OPENAI_RESPONSE_SCHEMA["properties"]
+
+    def assert_strict(node: object) -> None:
+        if isinstance(node, dict):
+            properties = node.get("properties")
+            if isinstance(properties, dict):
+                assert node.get("additionalProperties") is False
+                assert set(node.get("required", [])) == set(properties)
+            for value in node.values():
+                assert_strict(value)
+        elif isinstance(node, list):
+            for value in node:
+                assert_strict(value)
+
+    assert_strict(OPENAI_RESPONSE_SCHEMA)
+
+
+def test_sandbox_session_model_matches_applied_schema():
+    columns = set(SandboxSession.__table__.columns.keys())
+    assert "created_at" not in columns
+    assert {"started_at", "updated_at"}.issubset(columns)
 
 
 def test_missing_token(client):

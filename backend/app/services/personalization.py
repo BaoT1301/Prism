@@ -1,4 +1,5 @@
 import asyncio
+from copy import deepcopy
 import json
 from pathlib import Path
 from datetime import UTC, datetime
@@ -18,6 +19,54 @@ from app.schemas.personalization import GeneratedContent, ReflectionQuestion
 
 CONTRACT_PATH = Path(__file__).parents[3] / "contracts" / "sandbox-spec.schema.json"
 SANDBOX_SCHEMA = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+
+
+def _strict_schema(schema: dict) -> dict:
+    """Convert the product schema to the strict subset accepted by Structured Outputs."""
+    result = deepcopy(schema)
+
+    def json_type(value: object) -> str:
+        if isinstance(value, bool):
+            return "boolean"
+        if isinstance(value, int):
+            return "integer"
+        if isinstance(value, float):
+            return "number"
+        if value is None:
+            return "null"
+        return "string"
+
+    def visit(node: object) -> None:
+        if isinstance(node, dict):
+            for keyword in ("$schema", "$id"):
+                node.pop(keyword, None)
+            if "type" not in node and "const" in node:
+                node["type"] = json_type(node["const"])
+            if "type" not in node and isinstance(node.get("enum"), list) and node["enum"]:
+                enum_types = {json_type(value) for value in node["enum"]}
+                node["type"] = enum_types.pop() if len(enum_types) == 1 else sorted(enum_types)
+            properties = node.get("properties")
+            if isinstance(properties, dict):
+                node["additionalProperties"] = False
+                node["required"] = list(properties)
+            for value in node.values():
+                visit(value)
+        elif isinstance(node, list):
+            for value in node:
+                visit(value)
+
+    visit(result)
+    return result
+
+
+def _response_schema() -> dict:
+    schema = GeneratedContent.model_json_schema()
+    schema["properties"].pop("provider_response_id", None)
+    schema["properties"]["sandbox_spec"] = deepcopy(SANDBOX_SCHEMA)
+    return _strict_schema(schema)
+
+
+OPENAI_RESPONSE_SCHEMA = _response_schema()
 
 
 class PersonalizationProvider(Protocol):
@@ -83,7 +132,7 @@ class OpenAIPersonalizationProvider:
         }
         response = await self.client.responses.create(
             model=self.model, store=False, input=json.dumps(prompt),
-            text={"format": {"type": "json_schema", "name": "generated_assignment", "strict": True, "schema": GeneratedContent.model_json_schema()}},
+            text={"format": {"type": "json_schema", "name": "generated_assignment", "strict": True, "schema": OPENAI_RESPONSE_SCHEMA}},
         )
         try:
             result = GeneratedContent.model_validate_json(response.output_text)

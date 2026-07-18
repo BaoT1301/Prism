@@ -1,6 +1,6 @@
 import pytest
 
-from app.api.routes.sessions import hint, owned_session, submit, update_progress
+from app.api.routes.sessions import assignment_progress, hint, owned_session, submit, update_progress
 from app.core.errors import ApiError
 from app.models.models import AssignmentStatus, Profile, UserRole
 from app.schemas.domain import AssignmentCreate, AssignmentUpdate, ClassCreate, InterestsRequest
@@ -145,3 +145,30 @@ def test_submission_requires_declared_completion(domain_db):
     with pytest.raises(ApiError) as error:
         submit(session.id, SubmitRequest(expected_session_version=1), db, student)
     assert error.value.detail["code"] == "SANDBOX_INCOMPLETE"
+
+
+def test_teacher_assignment_progress_shows_every_member_without_grading(domain_db):
+    db, teacher, student, other_student, _ = domain_db
+    domain = DomainService()
+    classroom = domain.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
+    domain.join_class(db, student, classroom.join_code)
+    domain.join_class(db, other_student, classroom.join_code)
+    assignment = domain.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Force", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type="parameter_explorer"))
+    domain.publish_assignment(db, assignment.id, teacher)
+    interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
+    _, session, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
+
+    initial = assignment_progress(assignment.id, db, teacher)
+    initial_statuses = {item["student_id"]: item["status"] for item in initial["items"]}
+    assert initial_statuses == {student.id: "in_progress", other_student.id: "not_started"}
+
+    answers = [{"question_id": "reflection-1", "answer": "Force increases."}]
+    update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers), db, student)
+    submit(session.id, SubmitRequest(expected_session_version=2, reflection_answers=answers), db, student)
+
+    completed = assignment_progress(assignment.id, db, teacher)
+    student_row = next(item for item in completed["items"] if item["student_id"] == student.id)
+    assert student_row["status"] == "submitted"
+    assert student_row["completed_steps"] == student_row["total_steps"] == 3
+    assert student_row["hints_used"] == 0
+    assert student_row["submitted_at"] is not None

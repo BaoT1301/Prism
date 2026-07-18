@@ -9,10 +9,20 @@ from sqlalchemy.orm import Session
 from app.api.dependencies.auth import get_student, get_teacher
 from app.core.errors import ApiError
 from app.db.session import get_db
-from app.models.models import Assignment, GeneratedAssignment, Profile, SandboxSession, SandboxSessionStatus, Submission
+from app.models.models import (
+    Assignment,
+    ClassMember,
+    GeneratedAssignment,
+    GenerationStatus,
+    Profile,
+    SandboxSession,
+    SandboxSessionStatus,
+    Submission,
+)
 from app.schemas.sessions import (
     HintRequest,
     HintResponse,
+    AssignmentProgressListResponse,
     ProgressRequest,
     SandboxSessionResponse,
     SubmissionListResponse,
@@ -43,6 +53,7 @@ def session_data(item: SandboxSession) -> dict:
         "responses": item.responses,
         "reflection_answers": item.progress.get("reflection_answers", []),
         "hints_used": item.hints_used,
+        "submitted_at": item.submitted_at,
         "updated_at": item.updated_at,
     }
 
@@ -126,3 +137,50 @@ def submissions(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)
         raise ApiError(404, "ASSIGNMENT_NOT_FOUND", "The requested assignment was not found.")
     rows = db.execute(select(Submission, Profile).join(Profile, Profile.id == Submission.student_id).where(Submission.assignment_id == assignment_id)).all()
     return {"items": [{"submission_id": item.id, "student_id": item.student_id, "student_name": profile.display_name, "status": "submitted", "submitted_at": item.submitted_at} for item, profile in rows], "total": len(rows)}
+
+
+@router.get("/assignments/{assignment_id}/progress", response_model=AssignmentProgressListResponse)
+def assignment_progress(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    assignment = db.get(Assignment, assignment_id)
+    if assignment is None or assignment.teacher_id != teacher.id:
+        raise ApiError(404, "ASSIGNMENT_NOT_FOUND", "The requested assignment was not found.")
+
+    members = db.execute(
+        select(ClassMember, Profile)
+        .join(Profile, Profile.id == ClassMember.student_id)
+        .where(ClassMember.class_id == assignment.class_id)
+        .order_by(Profile.display_name)
+    ).all()
+    generated_rows = db.execute(
+        select(GeneratedAssignment, SandboxSession)
+        .outerjoin(SandboxSession, SandboxSession.generated_assignment_id == GeneratedAssignment.id)
+        .where(
+            GeneratedAssignment.assignment_id == assignment_id,
+            GeneratedAssignment.status == GenerationStatus.COMPLETED,
+        )
+        .order_by(GeneratedAssignment.created_at.desc())
+    ).all()
+    sessions_by_student: dict[uuid.UUID, tuple[GeneratedAssignment, SandboxSession | None]] = {}
+    for generated, session in generated_rows:
+        sessions_by_student.setdefault(generated.student_id, (generated, session))
+    submissions_by_student = {
+        item.student_id: item
+        for item in db.scalars(select(Submission).where(Submission.assignment_id == assignment_id)).all()
+    }
+
+    items = []
+    for member, profile in members:
+        generated, session = sessions_by_student.get(member.student_id, (None, None))
+        submission = submissions_by_student.get(member.student_id)
+        total_steps = len((generated.sandbox_spec or {}).get("guided_steps", [])) if generated else 0
+        completed_steps = len(session.completed_step_ids) if session else 0
+        items.append({
+            "student_id": member.student_id,
+            "student_name": profile.display_name,
+            "status": "submitted" if submission else "in_progress" if generated else "not_started",
+            "completed_steps": completed_steps,
+            "total_steps": total_steps,
+            "hints_used": session.hints_used if session else 0,
+            "submitted_at": submission.submitted_at if submission else None,
+        })
+    return {"items": items, "total": len(items)}

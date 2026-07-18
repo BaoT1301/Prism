@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -42,6 +42,7 @@ class SandboxSessionResponse(BaseModel):
     responses: dict[str, Any]
     reflection_answers: list[ReflectionAnswer]
     hints_used: int = Field(ge=0)
+    submitted_at: datetime | None
     updated_at: datetime
 
 
@@ -69,4 +70,19 @@ class SubmissionSummaryResponse(BaseModel):
 
 class SubmissionListResponse(BaseModel):
     items: list[SubmissionSummaryResponse]
+    total: int = Field(ge=0)
+
+
+class AssignmentProgressResponse(BaseModel):
+    student_id: uuid.UUID
+    student_name: str
+    status: Literal["not_started", "in_progress", "submitted"]
+    completed_steps: int = Field(ge=0)
+    total_steps: int = Field(ge=0)
+    hints_used: int = Field(ge=0)
+    submitted_at: datetime | None
+
+
+class AssignmentProgressListResponse(BaseModel):
+    items: list[AssignmentProgressResponse]
     total: int = Field(ge=0)

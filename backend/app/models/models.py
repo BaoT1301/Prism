@@ -162,7 +162,7 @@ class GeneratedAssignment(Base):
     )
 
 
-class SandboxSession(TimestampMixin, Base):
+class SandboxSession(Base):
     __tablename__ = "sandbox_sessions"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     generated_assignment_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("generated_assignments.id", ondelete="RESTRICT"), nullable=False, index=True)
@@ -181,6 +181,7 @@ class SandboxSession(TimestampMixin, Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     __table_args__ = (
         UniqueConstraint("generated_assignment_id", "student_id", name="uq_sandbox_session_generation_student"),
         CheckConstraint("version >= 1", name="ck_sandbox_sessions_version"),

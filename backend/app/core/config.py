@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     clerk_secret_key: str | None = Field(default=None, repr=False)
     clerk_api_url: str = "https://api.clerk.com"
     openai_api_key: str | None = Field(default=None, repr=False)
-    openai_model: str = "gpt-5.6"
+    openai_model: str = "gpt-5.6-luna"
     openai_moderation_model: str = "omni-moderation-latest"
     frontend_url: str = "http://localhost:5173"
     demo_mode: bool = False

@@ -401,6 +401,7 @@ Response `200`:
     "responses": {},
     "reflection_answers": [],
     "hints_used": 0,
+    "submitted_at": null,
     "updated_at": "2026-07-15T21:00:00Z"
   }
 }
@@ -476,6 +477,7 @@ Response:
     }
   ],
   "hints_used": 0,
+  "submitted_at": null,
   "updated_at": "2026-07-15T21:05:00Z"
 }
 ```
@@ -604,6 +606,33 @@ Response:
 ```
 
 Do not expose private AI chat transcripts.
+
+### GET `/assignments/{assignment_id}/progress`
+
+Teacher owner only. Returns every enrolled student for the assignment's class.
+This is completion visibility, not grading; it never exposes reflection answers or
+private tutor conversations.
+
+Response `200`:
+
+```json
+{
+  "items": [
+    {
+      "student_id": "f230f06d-a9b0-4e3c-b191-bf8c14ae6907",
+      "student_name": "Student One",
+      "status": "in_progress",
+      "completed_steps": 2,
+      "total_steps": 3,
+      "hints_used": 1,
+      "submitted_at": null
+    }
+  ],
+  "total": 1
+}
+```
+
+`status` is one of `not_started`, `in_progress`, or `submitted`.
 
 ### Sandbox completion checks
 

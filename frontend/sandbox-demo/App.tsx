@@ -6,7 +6,7 @@ import { SandboxRenderer } from "../features/sandbox/SandboxRenderer";
 import { validateSandboxSpec } from "../features/sandbox/sandbox-validation";
 import type { SandboxSpec } from "../features/sandbox/sandbox-types";
 import { createDemoSandboxApi, type DemoSandboxApi } from "./demo-api";
-import "./styles.css";
+import "../styles.css";
 
 const fixtureMap = {
   basketball: validateSandboxSpec(basketball),
