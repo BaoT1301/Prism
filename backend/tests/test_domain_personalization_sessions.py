@@ -11,6 +11,14 @@ from app.services.personalization import FixturePersonalizationProvider, Persona
 from app.services.sandbox import automatic_step_ids, build_progressive_hint
 
 
+class FailingPersonalizationProvider:
+    model = "failing-provider"
+    prompt_version = "test-v1"
+
+    async def generate(self, assignment, interests):
+        raise RuntimeError("provider unavailable")
+
+
 @pytest.fixture
 def domain_db(client):
     _, session_factory = client
@@ -77,6 +85,26 @@ def test_fixture_generation_is_valid_cached_and_session_safe(domain_db):
     assert provider.start(db, assignment, student, interests)[2] == "hit"
     with pytest.raises(ApiError):
         owned_session(db, session.id, other_student)
+
+
+def test_generation_falls_back_to_validated_fixture(domain_db):
+    db, teacher, student, _, _ = domain_db
+    domain = DomainService()
+    classroom = domain.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
+    domain.join_class(db, student, classroom.join_code)
+    assignment = domain.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Force", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type="parameter_explorer"))
+    domain.publish_assignment(db, assignment.id, teacher)
+    interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
+
+    service = PersonalizationService(FailingPersonalizationProvider(), fallback_provider=FixturePersonalizationProvider())
+    generated, session, cache = service.start(db, assignment, student, interests)
+
+    assert cache == "miss"
+    assert generated.status.value == "completed"
+    assert generated.model == "fixture"
+    assert generated.learning_objective == assignment.learning_objective
+    assert generated.sandbox_spec["sandbox_type"] == "parameter_explorer"
+    assert session.student_id == student.id
 
 
 def test_objective_and_schema_invariants_are_enforced(domain_db):

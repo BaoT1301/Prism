@@ -304,10 +304,13 @@ The generated assignment must map to typed Pydantic models and the sandbox JSON 
 
 ### Retry policy
 
-- Retry transient provider errors with bounded exponential backoff.
+- Bound the synchronous live-provider request and fail over without provider
+  retries so the student request completes within the application timeout.
 - Retry one structured-output correction when the model returns invalid content.
 - Do not retry validation errors indefinitely.
-- Fall back to a deterministic fixture for the golden demo when `DEMO_MODE=true`.
+- Fall back to a validated deterministic fixture when live generation fails so a
+  student is not locked out of an assignment.
+- Use `DEMO_MODE=true` to force the deterministic provider for a rehearsed demo.
 
 ### Storage and privacy
 

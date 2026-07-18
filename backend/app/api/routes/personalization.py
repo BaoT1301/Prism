@@ -19,8 +19,10 @@ router = APIRouter(tags=["personalization"])
 
 def get_service() -> PersonalizationService:
     settings = get_settings()
-    provider = FixturePersonalizationProvider() if settings.demo_mode else OpenAIPersonalizationProvider(settings)
-    return PersonalizationService(provider)
+    fixture_provider = FixturePersonalizationProvider()
+    if settings.demo_mode or not settings.openai_api_key:
+        return PersonalizationService(fixture_provider)
+    return PersonalizationService(OpenAIPersonalizationProvider(settings), fallback_provider=fixture_provider)
 
 
 @router.post("/assignments/{assignment_id}/start", response_model=StartResponse)

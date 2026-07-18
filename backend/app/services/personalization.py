@@ -1,6 +1,7 @@
 import asyncio
 from copy import deepcopy
 import json
+import logging
 from pathlib import Path
 from datetime import UTC, datetime
 from time import perf_counter
@@ -19,6 +20,7 @@ from app.schemas.personalization import GeneratedContent, ReflectionQuestion
 
 CONTRACT_PATH = Path(__file__).parents[3] / "contracts" / "sandbox-spec.schema.json"
 SANDBOX_SCHEMA = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+logger = logging.getLogger(__name__)
 
 
 def _strict_schema(schema: dict) -> dict:
@@ -116,7 +118,7 @@ class OpenAIPersonalizationProvider:
     def __init__(self, settings: Settings) -> None:
         if not settings.openai_api_key:
             raise ApiError(503, "AI_NOT_CONFIGURED", "The personalization provider is not configured.")
-        self.client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=20.0, max_retries=2)
+        self.client = AsyncOpenAI(api_key=settings.openai_api_key, timeout=20.0, max_retries=0)
         self.model = settings.openai_model
         self.prompt_version = "v1"
 
@@ -142,8 +144,9 @@ class OpenAIPersonalizationProvider:
 
 
 class PersonalizationService:
-    def __init__(self, provider: PersonalizationProvider) -> None:
+    def __init__(self, provider: PersonalizationProvider, fallback_provider: PersonalizationProvider | None = None) -> None:
         self.provider = provider
+        self.fallback_provider = fallback_provider
 
     def validate(self, assignment: Assignment, content: GeneratedContent) -> None:
         if content.learning_objective.strip() != assignment.learning_objective.strip():
@@ -189,27 +192,23 @@ class PersonalizationService:
                 db.rollback()
                 raise ApiError(409, "GENERATION_PENDING", "Personalization is already in progress.") from exc
         started = perf_counter()
+        used_provider = self.provider
         try:
-            for attempt in range(2):
-                try:
-                    content = asyncio.run(self.provider.generate(assignment, interests))
-                    self.validate(assignment, content)
-                    break
-                except ApiError as exc:
-                    if attempt == 0 and exc.detail["code"] in {"INVALID_AI_OUTPUT", "OBJECTIVE_INVARIANT_FAILED"}:
-                        continue
-                    raise
-        except ApiError:
-            pending.status = GenerationStatus.FAILED
-            pending.failure_code = "generation_failed"
-            db.commit()
-            raise
-        except Exception as exc:
-            pending.status = GenerationStatus.FAILED
-            pending.failure_code = "provider_error"
-            pending.failure_message = "The personalization provider failed."
-            db.commit()
-            raise ApiError(502, "PERSONALIZATION_FAILED", "Personalization is temporarily unavailable.") from exc
+            content = self._generate_validated(self.provider, assignment, interests)
+        except Exception as primary_error:
+            fallback_provider = self.fallback_provider
+            if fallback_provider is None:
+                self._mark_failed(db, pending, primary_error)
+            logger.warning(
+                "personalization_fallback primary_provider=%s error_type=%s",
+                self.provider.__class__.__name__,
+                primary_error.__class__.__name__,
+            )
+            used_provider = fallback_provider
+            try:
+                content = self._generate_validated(used_provider, assignment, interests)
+            except Exception as fallback_error:
+                self._mark_failed(db, pending, fallback_error)
         pending.status = GenerationStatus.COMPLETED
         pending.personalized_title = content.personalized_title
         pending.scenario = content.scenario
@@ -219,13 +218,41 @@ class PersonalizationService:
         pending.reflection_questions = [question.model_dump() for question in content.reflection_questions]
         pending.sandbox_spec = content.sandbox_spec
         pending.provider_response_id = content.provider_response_id
-        pending.model = getattr(self.provider, "model", self.provider.__class__.__name__)
-        pending.prompt_version = getattr(self.provider, "prompt_version", "v1")
+        pending.model = getattr(used_provider, "model", used_provider.__class__.__name__)
+        pending.prompt_version = getattr(used_provider, "prompt_version", "v1")
         pending.generation_latency_ms = int((perf_counter() - started) * 1000)
         pending.completed_at = datetime.now(UTC)
         db.commit()
         db.refresh(pending)
         return pending, self._session(db, pending, student), "miss"
+
+    def _generate_validated(
+        self,
+        provider: PersonalizationProvider,
+        assignment: Assignment,
+        interests: InterestProfile,
+    ) -> GeneratedContent:
+        for attempt in range(2):
+            try:
+                content = asyncio.run(provider.generate(assignment, interests))
+                self.validate(assignment, content)
+                return content
+            except ApiError as exc:
+                correctable = exc.detail["code"] in {"INVALID_AI_OUTPUT", "OBJECTIVE_INVARIANT_FAILED"}
+                if attempt == 0 and correctable:
+                    continue
+                raise
+        raise RuntimeError("Personalization generation exhausted its retry budget.")
+
+    @staticmethod
+    def _mark_failed(db: Session, pending: GeneratedAssignment, error: Exception) -> None:
+        pending.status = GenerationStatus.FAILED
+        pending.failure_code = "generation_failed" if isinstance(error, ApiError) else "provider_error"
+        pending.failure_message = "The personalization provider failed."
+        db.commit()
+        if isinstance(error, ApiError):
+            raise error
+        raise ApiError(502, "PERSONALIZATION_FAILED", "Personalization is temporarily unavailable.") from error
 
     def _session(self, db: Session, generated: GeneratedAssignment, student: Profile) -> SandboxSession:
         session = db.scalar(select(SandboxSession).where(SandboxSession.generated_assignment_id == generated.id, SandboxSession.student_id == student.id))

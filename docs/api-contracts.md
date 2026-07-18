@@ -420,6 +420,8 @@ Behavior:
 - Idempotently returns the existing generation for the same assignment content version, student, and interest profile version.
 - Creates or resumes an active session.
 - Does not expose another student's generated content.
+- Uses the validated deterministic personalization provider if live AI generation
+  fails, preserving the objective and sandbox contract.
 
 Possible errors:
 

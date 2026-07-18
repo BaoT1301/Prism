@@ -78,9 +78,12 @@ export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
       </section>
 
       <div className="landing-marquee" aria-hidden="true">
-        <div>
-          <span>One objective</span><i>✦</i><span>Personal context</span><i>✦</i><span>Interactive discovery</span><i>✦</i>
-          <span>One objective</span><i>✦</i><span>Personal context</span><i>✦</i><span>Interactive discovery</span><i>✦</i>
+        <div className="landing-marquee-track">
+          {[0, 1].map((copy) => (
+            <div className="landing-marquee-group" key={copy}>
+              <span>One objective</span><i>✦</i><span>Personal context</span><i>✦</i><span>Interactive discovery</span><i>✦</i>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -141,7 +144,19 @@ export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
               <div className="mini-progress"><span><i /></span><small>2 of 3 discoveries complete</small></div>
             </div>
             <div className="product-simulation" aria-hidden="true">
-              <div className="sim-court"><span /><span /><i /></div>
+              <div className="sim-court">
+                <span className="sim-ball"><i /><i /></span>
+                <svg className="sim-hoop" viewBox="0 0 240 280" role="presentation">
+                  <path className="hoop-support" d="M196 74v188M196 226h27" />
+                  <rect className="hoop-board" x="62" y="28" width="142" height="91" rx="4" />
+                  <rect className="hoop-square" x="105" y="62" width="58" height="43" rx="2" />
+                  <path className="hoop-brace" d="M163 84h33" />
+                  <ellipse className="hoop-rim" cx="134" cy="119" rx="49" ry="11" />
+                  <path className="hoop-net-edge" d="M89 122l13 78h64l13-78" />
+                  <path className="hoop-net" d="M101 125l13 75m18-74 2 74m20-75-9 75M94 146h78M98 171h70M103 193h62M99 132l62 68m10-68-58 68" />
+                </svg>
+                <span className="court-line" />
+              </div>
               <div className="sim-readout"><span>Mass<strong>0.62 kg</strong></span><span>Acceleration<strong>8.0 m/s²</strong></span><span>Force<strong>4.96 N</strong></span></div>
             </div>
             <aside className="product-coach"><span>✦</span><p>Prism guide</p><h4>What do you notice as acceleration increases?</h4><button type="button" tabIndex={-1}>Ask for a hint</button></aside>
