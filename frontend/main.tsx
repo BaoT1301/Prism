@@ -20,8 +20,8 @@ function App() {
   return (
     <ClerkProvider
       publishableKey={clerkKey}
-      signInUrl="/#/sign-in"
-      signUpUrl="/#/sign-up"
+      signInUrl="/?auth=sign-in"
+      signUpUrl="/?auth=sign-in"
       appearance={{
         variables: {
           colorPrimary: "#2922a8",
@@ -61,31 +61,15 @@ function App() {
             letterSpacing: "-0.035em",
           },
           headerSubtitle: { color: "#68675f", fontSize: "0.9rem" },
-          socialButtonsBlockButton: {
-            minHeight: "2.9rem",
-            border: "1px solid #171712",
-            borderRadius: "0.75rem",
-            boxShadow: "none",
-          },
-          socialButtonsBlockButtonText: { color: "#171712", fontWeight: 700 },
+          socialButtonsBlockButton: "prism-clerk-social-button",
+          socialButtonsBlockButtonText: "prism-clerk-social-button-text",
           dividerLine: { background: "#aaa69a" },
           dividerText: { color: "#68675f", fontSize: "0.74rem", fontWeight: 700, textTransform: "uppercase" },
           formFieldLabel: { color: "#171712", fontWeight: 700 },
-          formFieldInput: {
-            minHeight: "2.9rem",
-            border: "1px solid #8d8a7e",
-            borderRadius: "0.75rem",
-            boxShadow: "none",
-          },
+          formFieldInput: "prism-clerk-input",
           formFieldInputShowPasswordButton: { color: "#2922a8" },
           formFieldAction: { color: "#2922a8", fontWeight: 700 },
-          formButtonPrimary: {
-            minHeight: "3rem",
-            border: "1px solid #171712",
-            borderRadius: "0.75rem",
-            boxShadow: "3px 3px 0 #171712",
-            fontWeight: 700,
-          },
+          formButtonPrimary: "prism-clerk-primary-button",
           footer: { marginTop: "1.4rem", background: "transparent" },
           footerActionText: { color: "#68675f" },
           footerActionLink: { color: "#2922a8", fontWeight: 700 },

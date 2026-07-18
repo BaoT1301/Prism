@@ -44,18 +44,26 @@ export function AuthApp() {
   useEffect(() => {
     const updateRoute = () => setRoute(location.hash);
     addEventListener("hashchange", updateRoute);
-    return () => removeEventListener("hashchange", updateRoute);
+    addEventListener("popstate", updateRoute);
+    return () => {
+      removeEventListener("hashchange", updateRoute);
+      removeEventListener("popstate", updateRoute);
+    };
   }, []);
 
   if (!isLoaded) {
     return <main className="loading-screen"><span className="loading-mark" aria-hidden="true" /><p>Opening your Prism workspace...</p></main>;
   }
 
-  const isAuthRoute = route.startsWith("#/sign-in") || route.startsWith("#/sign-up");
+  const authRoute = new URLSearchParams(location.search).get("auth");
+  const isAuthRoute = authRoute === "sign-in" || authRoute === "sign-up";
   const isLandingRoute = !isSignedIn ? !isAuthRoute : route === "#/welcome";
 
   if (isLandingRoute) {
-    return <LandingPage isSignedIn={Boolean(isSignedIn)} onEnter={() => { location.hash = isSignedIn ? "#/" : "#/sign-in"; }} />;
+    return <LandingPage isSignedIn={Boolean(isSignedIn)} onEnter={() => {
+      if (isSignedIn) location.hash = "#/";
+      else location.assign("/?auth=sign-in");
+    }} />;
   }
 
   if (!isSignedIn) {
@@ -67,12 +75,10 @@ export function AuthApp() {
           <p>Sign in or create an account. Your work will be right where you left it.</p>
         </div>
         <SignIn
-          routing="hash"
-          signInUrl="/#/sign-in"
-          signUpUrl="/#/sign-up"
           withSignUp
-          fallbackRedirectUrl="/#/"
-          signUpFallbackRedirectUrl="/#/"
+          signUpUrl="/?auth=sign-in"
+          fallbackRedirectUrl="/"
+          signUpFallbackRedirectUrl="/"
         />
       </AuthLayout>
     );
