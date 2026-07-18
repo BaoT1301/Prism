@@ -88,7 +88,7 @@ def test_development_cors_allows_localhost_and_loopback():
 
 
 def test_production_requires_clerk_auth_settings():
-    incomplete = Settings(environment="production")
+    incomplete = Settings(_env_file=None, environment="production")
     with pytest.raises(RuntimeError, match="CLERK_JWKS_URL"):
         incomplete.validate_production()
     settings = Settings(environment="production", clerk_jwks_url="https://clerk.example/.well-known/jwks.json", clerk_issuer="https://clerk.example", clerk_authorized_parties="https://app.example", clerk_secret_key="secret_test_key")

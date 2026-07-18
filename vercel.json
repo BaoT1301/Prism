@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://prism-production-1902.up.railway.app/:path*"
+    }
+  ]
+}

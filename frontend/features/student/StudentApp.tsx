@@ -1,7 +1,7 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
 import { AppShell } from "../../components/AppChrome";
-import { apiRequest, type AccessTokenProvider } from "../../lib/api-client";
+import { apiRequest, resolveApiBaseUrl, type AccessTokenProvider } from "../../lib/api-client";
 import { createSandboxApi } from "../../lib/sandbox/sandbox-api";
 import { SandboxRenderer } from "../sandbox/SandboxRenderer";
 import type { SandboxLaunch } from "../sandbox/sandbox-types";
@@ -48,7 +48,7 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
   const [savingInterests, setSavingInterests] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
   const [launchingId, setLaunchingId] = useState<string>();
-  const apiBaseUrl = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_API_BASE_URL ?? "";
+  const apiBaseUrl = resolveApiBaseUrl();
   const sandboxApi = useMemo(() => createSandboxApi(apiBaseUrl, getAccessToken), [apiBaseUrl, getAccessToken]);
 
   const load = useCallback(() => {

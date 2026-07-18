@@ -4,14 +4,23 @@ export type ApiError = Error & { status?: number; code?: string; requestId?: str
 
 type ErrorBody = { error?: { code?: string; message?: string; request_id?: string }; code?: string; message?: string; request_id?: string };
 
+export function resolveApiBaseUrl(
+  hostname = typeof window === "undefined" ? "" : window.location.hostname,
+  configuredBaseUrl?: string,
+): string {
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  // Vercel rewrites this same-origin prefix to Railway. Keeping browser requests
+  // same-origin removes CORS from the student assignment launch path.
+  return hostname.endsWith(".vercel.app") ? "/api" : configuredBaseUrl ?? env?.VITE_API_BASE_URL ?? "";
+}
+
 export async function apiRequest<T>(
   path: string,
   options: RequestInit = {},
   getAccessToken?: AccessTokenProvider,
 ): Promise<T> {
   const token = await getAccessToken?.();
-  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
-  const response = await fetch(`${env?.VITE_API_BASE_URL ?? ""}${path}`, {
+  const response = await fetch(`${resolveApiBaseUrl()}${path}`, {
     ...options,
     headers: {
       Accept: "application/json",

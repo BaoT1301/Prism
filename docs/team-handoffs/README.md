@@ -39,8 +39,9 @@ flow, live OpenAI generation, and the deployed browser flow remain staging check
 3. Persons 2 and 3 consume that client; neither creates a second auth implementation.
 4. Person 4 owns the renderer but cannot change the sandbox schema alone.
 5. Person 5 works behind PersonalizationProvider; do not alter routes or migrations.
-6. The student host page must instantiate `createSandboxApi(VITE_API_BASE_URL, getAccessToken)`;
-   it must not use `createDemoSandboxApi` outside the standalone sandbox demo.
+6. The student host page must instantiate `createSandboxApi(resolveApiBaseUrl(), getAccessToken)`;
+   local development resolves `VITE_API_BASE_URL`, while Vercel resolves the same-origin
+   `/api` proxy. It must not use `createDemoSandboxApi` outside the standalone sandbox demo.
 7. Every PR is small, includes tests where applicable, and preserves documented API
    payloads. Coordinate any contract change with affected owners.
 
