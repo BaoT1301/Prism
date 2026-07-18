@@ -145,17 +145,16 @@ export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
             </div>
             <div className="product-simulation" aria-hidden="true">
               <div className="sim-court">
-                <span className="sim-ball"><i /><i /></span>
-                <svg className="sim-hoop" viewBox="0 0 240 280" role="presentation">
-                  <path className="hoop-support" d="M196 74v188M196 226h27" />
-                  <rect className="hoop-board" x="62" y="28" width="142" height="91" rx="4" />
-                  <rect className="hoop-square" x="105" y="62" width="58" height="43" rx="2" />
-                  <path className="hoop-brace" d="M163 84h33" />
-                  <ellipse className="hoop-rim" cx="134" cy="119" rx="49" ry="11" />
-                  <path className="hoop-net-edge" d="M89 122l13 78h64l13-78" />
-                  <path className="hoop-net" d="M101 125l13 75m18-74 2 74m20-75-9 75M94 146h78M98 171h70M103 193h62M99 132l62 68m10-68-58 68" />
+                <i className="sim-ball" />
+                <svg className="sim-hoop" viewBox="0 0 200 240" role="presentation">
+                  <path className="hoop-support" d="M168 62v158M168 181h22" />
+                  <rect className="hoop-board" x="43" y="21" width="124" height="75" rx="3" />
+                  <rect className="hoop-square" x="84" y="51" width="51" height="34" rx="2" />
+                  <path className="hoop-brace" d="M135 69h33" />
+                  <ellipse className="hoop-rim" cx="108" cy="96" rx="42" ry="9" />
+                  <path className="hoop-net-edge" d="M68 99l11 67h57l12-67" />
+                  <path className="hoop-net" d="M78 101l12 65m17-65 1 65m19-65-8 65M73 121h70M76 142h64M80 160h57M75 108l56 58m10-58-53 58" />
                 </svg>
-                <span className="court-line" />
               </div>
               <div className="sim-readout"><span>Mass<strong>0.62 kg</strong></span><span>Acceleration<strong>8.0 m/s²</strong></span><span>Force<strong>4.96 N</strong></span></div>
             </div>
