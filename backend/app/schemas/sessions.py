@@ -30,12 +30,24 @@ class ExperimentEventRequest(BaseModel):
     controlled_comparison: bool = False
 
 
+class SliderInteractionRequest(BaseModel):
+    """One meaningful, client-observed slider change."""
+
+    event_type: Literal["slider_changed"]
+    recorded_at: datetime
+    variable_id: str = Field(min_length=1, max_length=40)
+    previous_value: float
+    value: float
+    elapsed_ms: int | None = Field(default=None, ge=0, le=3_600_000)
+
+
 class ProgressRequest(BaseModel):
     expected_version: int = Field(ge=1)
     completed_step_ids: list[str] = Field(max_length=8)
     responses: dict[str, Any] = Field(default_factory=dict)
     reflection_answers: list[ReflectionAnswer] = Field(default_factory=list, max_length=5)
     experiment_event: ExperimentEventRequest | None = None
+    interaction_events: list[SliderInteractionRequest] = Field(default_factory=list, max_length=8)
 
 
 class HintRequest(BaseModel):

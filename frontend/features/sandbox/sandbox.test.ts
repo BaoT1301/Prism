@@ -41,6 +41,17 @@ describe("sandbox contract", () => {
     expect(buildProgressRequest(session, ["step-1"], { mass: 0.6, acceleration: 8 }, [{ question_id: "reflection-1", answer: "Force increases." }])).toEqual({ expected_version: 4, completed_step_ids: ["step-1"], responses: { mass: 0.6, acceleration: 8 }, reflection_answers: [{ question_id: "reflection-1", answer: "Force increases." }] });
   });
 
+  it("includes bounded slider interactions in progress updates", () => {
+    const session = { id: "session", version: 4, status: "in_progress" as const, completed_step_ids: [], responses: {}, reflection_answers: [], hints_used: 0 };
+    expect(buildProgressRequest(session, [], { mass: 0.7, acceleration: 8 }, [], undefined, [{ event_type: "slider_changed", recorded_at: "2026-07-18T12:00:00Z", variable_id: "mass", previous_value: 0.6, value: 0.7, elapsed_ms: 500 }])).toEqual({
+      expected_version: 4,
+      completed_step_ids: [],
+      responses: { mass: 0.7, acceleration: 8 },
+      reflection_answers: [],
+      interaction_events: [{ event_type: "slider_changed", recorded_at: "2026-07-18T12:00:00Z", variable_id: "mass", previous_value: 0.6, value: 0.7, elapsed_ms: 500 }],
+    });
+  });
+
   it("automatically completes value and reflection checks", () => {
     const spec = validateSandboxSpec(basketball);
     expect(automaticallyCompletedStepIds(spec, { mass: 0.7, acceleration: 8 }, [])).toEqual(["step-1"]);

@@ -11,6 +11,7 @@ from app.schemas.personalization import GeneratedContent
 from app.schemas.sessions import HintRequest, ProgressRequest, SubmitRequest
 from app.services.domain import DomainService
 from app.services.personalization import FixturePersonalizationProvider, PersonalizationService
+from app.services.hints import fallback_hint
 from app.services.sandbox import automatic_step_ids, build_progressive_hint
 
 
@@ -153,11 +154,14 @@ def test_progress_hints_and_idempotent_submission(domain_db):
     interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
     _, session, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
     answers = [{"question_id": "reflection-1", "answer": "Force increases."}]
-    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers, experiment_event={"event_type": "experiment_run", "recorded_at": "2026-07-18T12:00:00Z", "elapsed_ms": 1000, "values": {"mass": 2, "acceleration": 6}, "controlled_comparison": True}), db, student)
+    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers, interaction_events=[{"event_type": "slider_changed", "recorded_at": "2026-07-18T11:59:00Z", "variable_id": "mass", "previous_value": 1, "value": 2, "elapsed_ms": 500}], experiment_event={"event_type": "experiment_run", "recorded_at": "2026-07-18T12:00:00Z", "elapsed_ms": 1000, "values": {"mass": 2, "acceleration": 6}, "controlled_comparison": True}), db, student)
     assert updated["version"] == 2
     assert updated["reflection_answers"] == [{"question_id": "reflection-1", "answer": "Force increases."}]
     assert "explain-force" in updated["completed_step_ids"]
-    assert updated["interaction_events"] == [{"event_type": "experiment_run", "recorded_at": "2026-07-18T12:00:00Z", "elapsed_ms": 1000, "values": {"mass": 2.0, "acceleration": 6.0}, "controlled_comparison": True, "outputs": {"force": 12.0}, "mission_complete": True}]
+    assert updated["interaction_events"] == [
+        {"event_type": "slider_changed", "recorded_at": "2026-07-18T11:59:00Z", "variable_id": "mass", "previous_value": 1.0, "value": 2.0, "elapsed_ms": 500, "direction": "increased"},
+        {"event_type": "experiment_run", "recorded_at": "2026-07-18T12:00:00Z", "elapsed_ms": 1000, "values": {"mass": 2.0, "acceleration": 6.0}, "controlled_comparison": True, "outputs": {"force": 12.0}, "mission_complete": True},
+    ]
     with pytest.raises(ApiError):
         update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["bad"], responses={}), db, student)
     with pytest.raises(ApiError):
@@ -185,6 +189,24 @@ def test_completion_checks_and_progressive_hints(domain_db):
     assert automatic_step_ids(spec, {"mass": 2, "acceleration": 5}) == {"set-mass"}
     hints = [build_progressive_hint(spec, {"mass": 2, "acceleration": 5}, [], level, "set-mass") for level in (1, 2, 3)]
     assert len(set(hints)) == 3
+
+
+def test_fallback_hint_uses_slider_behavior(domain_db):
+    db, teacher, student, _, _ = domain_db
+    domain = DomainService()
+    classroom = domain.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
+    domain.join_class(db, student, classroom.join_code)
+    assignment = domain.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Force", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type="parameter_explorer"))
+    domain.publish_assignment(db, assignment.id, teacher)
+    interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
+    generated, _, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
+    spec = generated.sandbox_spec
+    events = [
+        {"event_type": "slider_changed", "variable_id": "mass", "previous_value": 0.6, "value": 0.7},
+        {"event_type": "slider_changed", "variable_id": "acceleration", "previous_value": 8, "value": 9},
+    ]
+    assert "one setting" in fallback_hint(spec, {"mass": 0.7, "acceleration": 9}, events, 1)
+    assert "comparison" in fallback_hint(spec, {"mass": 0.7, "acceleration": 9}, [events[0]], 2)
 
 
 def test_submission_requires_declared_completion(domain_db):

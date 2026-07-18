@@ -30,7 +30,7 @@ from app.schemas.sessions import (
     SubmissionResponse,
     SubmitRequest,
 )
-from app.services.sandbox import automatic_step_ids, build_progressive_hint, has_successful_mission_run, submission_ready
+from app.services.sandbox import automatic_step_ids, has_successful_mission_run, submission_ready
 from app.services.feedback import build_adaptive_feedback
 from app.services.hints import OpenAIHintProvider, fallback_hint
 from app.services.mission import evaluate_mission
@@ -93,13 +93,21 @@ def update_progress(session_id: uuid.UUID, data: ProgressRequest, db: Annotated[
     mission_evaluation = evaluate_mission(spec, data.responses) if spec.get("mission") else None
     progress = dict(item.progress or {})
     events = list(progress.get("interaction_events", []))[-19:]
+    for interaction in data.interaction_events:
+        variable = valid_variables.get(interaction.variable_id)
+        if variable is None or not variable.get("editable", True):
+            raise ApiError(422, "INVALID_INTERACTION_EVENT", "Slider interactions must reference editable variables.")
+        if not variable["min"] <= interaction.previous_value <= variable["max"] or not variable["min"] <= interaction.value <= variable["max"]:
+            raise ApiError(422, "INVALID_INTERACTION_EVENT", "Slider interaction values must match configured ranges.")
+        direction = "increased" if interaction.value > interaction.previous_value else "decreased" if interaction.value < interaction.previous_value else "unchanged"
+        events.append({**interaction.model_dump(mode="json"), "direction": direction})
     if data.experiment_event:
         event = data.experiment_event.model_dump(mode="json")
         outputs = evaluate_mission(spec, data.responses)["outputs"]
         event["outputs"] = outputs
         event["mission_complete"] = bool(mission_evaluation and mission_evaluation["complete"])
         events.append(event)
-    progress.update({"completed_step_ids": completed_step_ids, "responses": data.responses, "reflection_answers": answer_data, "interaction_events": events})
+    progress.update({"completed_step_ids": completed_step_ids, "responses": data.responses, "reflection_answers": answer_data, "interaction_events": events[-20:]})
     if mission_evaluation is not None:
         progress["mission_evaluation"] = mission_evaluation
     else:
@@ -122,10 +130,10 @@ def hint(session_id: uuid.UUID, data: HintRequest, db: Annotated[Session, Depend
     events = list((item.progress or {}).get("interaction_events", []))
     settings = get_settings()
     spec = generated.sandbox_spec or {}
-    hint_text = fallback_hint(spec, item.responses, events, item.hints_used) if spec.get("mission") else build_progressive_hint(spec, item.responses, item.completed_step_ids, item.hints_used, data.current_step_id)
-    if spec.get("mission") and settings.openai_api_key and not settings.demo_mode:
+    hint_text = fallback_hint(spec, item.responses, events, item.hints_used, data.current_step_id)
+    if settings.openai_api_key and not settings.demo_mode:
         try:
-            hint_text = OpenAIHintProvider(settings).generate_sync(spec, item.responses, events, item.hints_used)
+            hint_text = OpenAIHintProvider(settings).generate_sync(spec, item.responses, events, item.hints_used, data.question, data.current_step_id)
         except Exception:
             pass
     events.append({"event_type": "hint_requested", "recorded_at": datetime.now(UTC).isoformat(), "hint_level": item.hints_used})

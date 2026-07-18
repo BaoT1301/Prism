@@ -43,7 +43,6 @@ Postgres database; Uvicorn reads the Clerk settings from the root `.env` file.
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python -m pip install -e ".\backend[dev]"
-docker compose up -d db
 .\.venv\Scripts\alembic -c backend/alembic.ini upgrade head
 .\.venv\Scripts\uvicorn app.main:app --app-dir backend --reload
 ```
@@ -58,14 +57,7 @@ npm run dev
 Open `http://localhost:5173`. After changing a `VITE_*` value, restart the Vite
 server. After changing a backend setting, restart Uvicorn or the API container.
 
-### Run the API in Docker (optional)
-
-`docker compose up -d api` now reads Clerk settings from the ignored root `.env`
-file. It still uses the Docker Postgres database. Apply migrations from the host
-first using the command above, then start the API container:
-
 ```powershell
-docker compose up -d db
 .\.venv\Scripts\alembic -c backend/alembic.ini upgrade head
 docker compose up -d --build api
 ```

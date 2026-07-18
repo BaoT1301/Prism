@@ -119,15 +119,28 @@ export interface SandboxSession {
 }
 
 export interface InteractionEvent {
-  event_type: "experiment_run" | "hint_requested";
+  event_type: "slider_changed" | "experiment_run" | "hint_requested";
   recorded_at: string;
   elapsed_ms?: number;
+  variable_id?: string;
+  previous_value?: number;
+  value?: number;
+  direction?: "increased" | "decreased" | "unchanged";
   values?: Record<string, number>;
   controlled_comparison?: boolean;
   /** Server-calculated fields returned in session history, never sent by the client. */
   outputs?: Record<string, number>;
   mission_complete?: boolean;
   bonus_attempted?: boolean;
+}
+
+export interface SliderInteractionEventRequest {
+  event_type: "slider_changed";
+  recorded_at: string;
+  variable_id: string;
+  previous_value: number;
+  value: number;
+  elapsed_ms?: number;
 }
 
 export interface ExperimentEventRequest {
@@ -178,6 +191,7 @@ export interface ProgressRequest {
   responses: Record<string, number>;
   reflection_answers: ReflectionAnswer[];
   experiment_event?: ExperimentEventRequest;
+  interaction_events?: SliderInteractionEventRequest[];
 }
 
 export interface ProgressResponse extends SandboxSession {

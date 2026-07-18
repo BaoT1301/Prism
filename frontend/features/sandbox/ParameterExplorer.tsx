@@ -12,7 +12,7 @@ import { completionRulesSatisfied, mergeCompletedStepIds } from "./completion";
 import { calculateFormula } from "./formula-registry";
 import { evaluateMission } from "./mission";
 import { buildProgressRequest, progressPercentage } from "./progress";
-import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec } from "./sandbox-types";
+import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec, SliderInteractionEventRequest } from "./sandbox-types";
 
 const ThreePhysicsScene = lazy(async () => {
   const module = await import("../../components/sandbox/ThreePhysicsScene");
@@ -52,6 +52,8 @@ export function ParameterExplorer({
   const firstRender = useRef(true);
   const sessionRef = useRef(initialSession);
   const saveGenerationRef = useRef(0);
+  const pendingInteractionEventsRef = useRef<SliderInteractionEventRequest[]>([]);
+  const lastInteractionAtRef = useRef(Date.now());
   sessionRef.current = session;
   const result = useMemo(() => calculateFormula(spec.formula_id, values), [spec.formula_id, values]);
   const missionEvaluation = spec.mission ? evaluateMission(spec, values) : undefined;
@@ -74,12 +76,14 @@ export function ParameterExplorer({
     const timer = window.setTimeout(async () => {
       setSaveStatus("saving");
       const requestSession = sessionRef.current;
+      const interactionEvents = pendingInteractionEventsRef.current.splice(0, 8);
       try {
-        const latest = await api.updateProgress(requestSession.id, buildProgressRequest(requestSession, completedStepIds, values, reflectionAnswers));
+        const latest = await api.updateProgress(requestSession.id, buildProgressRequest(requestSession, completedStepIds, values, reflectionAnswers, undefined, interactionEvents));
         sessionRef.current = { ...sessionRef.current, ...latest };
         setSession((current) => ({ ...current, ...latest }));
         if (generation === saveGenerationRef.current) setSaveStatus("saved");
       } catch (error) {
+        pendingInteractionEventsRef.current = [...interactionEvents, ...pendingInteractionEventsRef.current].slice(-8);
         if (error instanceof SandboxApiError && error.status === 409) {
           const latest = await api.getSession(requestSession.id);
           sessionRef.current = latest;
@@ -96,7 +100,20 @@ export function ParameterExplorer({
     setIsRequestingHint(true);
     setHintError(undefined);
     try {
-      const nextHint = await api.requestHint(session.id, "", spec.guided_steps.find((step) => !completedStepIds.includes(step.id))?.id);
+      let currentSession = sessionRef.current;
+      const interactionEvents = pendingInteractionEventsRef.current.splice(0, 8);
+      if (interactionEvents.length > 0) {
+        try {
+          const latest = await api.updateProgress(currentSession.id, buildProgressRequest(currentSession, completedStepIds, values, reflectionAnswers, undefined, interactionEvents));
+          currentSession = latest;
+          sessionRef.current = latest;
+          setSession((current) => ({ ...current, ...latest }));
+        } catch (error) {
+          pendingInteractionEventsRef.current = [...interactionEvents, ...pendingInteractionEventsRef.current].slice(-8);
+          throw error;
+        }
+      }
+      const nextHint = await api.requestHint(currentSession.id, "", spec.guided_steps.find((step) => !completedStepIds.includes(step.id))?.id);
       setHint(nextHint);
       setSession((current) => ({ ...current, hints_used: nextHint.hint_level }));
     } catch (error) {
@@ -104,6 +121,24 @@ export function ParameterExplorer({
     } finally {
       setIsRequestingHint(false);
     }
+  }
+
+  function onVariableChange(variableId: string, nextValue: number) {
+    setValues((current) => {
+      const previousValue = current[variableId];
+      if (previousValue === nextValue) return current;
+      const now = Date.now();
+      pendingInteractionEventsRef.current.push({
+        event_type: "slider_changed",
+        recorded_at: new Date(now).toISOString(),
+        variable_id: variableId,
+        previous_value: previousValue,
+        value: nextValue,
+        elapsed_ms: now - lastInteractionAtRef.current,
+      });
+      lastInteractionAtRef.current = now;
+      return { ...current, [variableId]: nextValue };
+    });
   }
 
   async function submit() {
@@ -176,7 +211,7 @@ export function ParameterExplorer({
 
         <section className="controls-card">
           <div className="section-heading"><div><p className="card-kicker">Physics controls</p><h2>Shape the experiment.</h2></div><div className="formula-display"><span>Force = Mass × Acceleration</span><strong>{result.toFixed(2)} N</strong></div></div>
-          <div className="variable-grid">{spec.variables.map((variable) => <VariableSlider key={variable.id} variable={variable} value={values[variable.id]} onChange={(value) => setValues((current) => ({ ...current, [variable.id]: value }))} />)}</div>
+          <div className="variable-grid">{spec.variables.map((variable) => <VariableSlider key={variable.id} variable={variable} value={values[variable.id]} onChange={(value) => onVariableChange(variable.id, value)} />)}</div>
           <div className="physics-hud"><div><span>Mass</span><strong>{values.mass} <small>kg</small></strong></div><div><span>Acceleration</span><strong>{values.acceleration} <small>m/s²</small></strong></div><div className="hud-force"><span>Force</span><strong>{result.toFixed(2)} <small>N</small></strong></div></div>
         </section>
 

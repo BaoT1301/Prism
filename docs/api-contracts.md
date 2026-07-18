@@ -456,6 +456,16 @@ Request:
       "question_id": "reflection-1",
       "answer": "Force increases when acceleration increases."
     }
+  ],
+  "interaction_events": [
+    {
+      "event_type": "slider_changed",
+      "recorded_at": "2026-07-15T21:04:30Z",
+      "variable_id": "acceleration",
+      "previous_value": 8,
+      "value": 9,
+      "elapsed_ms": 1200
+    }
   ]
 }
 ```
@@ -494,6 +504,13 @@ cannot supply either value. Session history retains at most 20 events.
 For a sandbox with `mission`, submission also requires at least one recorded
 `experiment_run` that the server evaluated as successful. Sandboxes without a mission
 keep the original guided-step completion behavior.
+
+`interaction_events` is an optional bounded list of up to eight meaningful slider
+changes. Each item accepts `event_type: "slider_changed"`, `recorded_at`,
+`variable_id`, `previous_value`, `value`, and an optional `elapsed_ms`. The server
+validates the variable and range, derives the direction of change, and retains these
+events with the session's most recent interaction history. Clients must not provide
+derived outputs or coaching judgments. This history is used to personalize hints.
 
 `sandbox_spec.mission` is an optional backward-compatible enhancement. New
 personalized assignments may include it to expose deterministic numeric constraints;
