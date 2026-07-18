@@ -48,4 +48,14 @@ describe("local sandbox demo API", () => {
     expect(reloaded.responses.mass).toBe(0.7);
     expect(reloaded.reflection_answers).toEqual([{ question_id: "reflection-1", answer: "Force increases." }]);
   });
+
+  it("replaces stale demo state that no longer fits the active fixture", async () => {
+    const storage = memoryStorage();
+    storage.setItem("prism-sandbox-demo:v3:Basketball Force Lab", JSON.stringify({
+      session: { id: "stale", version: 2, status: "in_progress", completed_step_ids: ["step-1"], responses: { mass: 999, acceleration: 8 }, reflection_answers: [], hints_used: 0 },
+    }));
+    const launch = await createDemoSandboxApi(validateSandboxSpec(basketball), storage).launchAssignment("demo-assignment");
+    expect(launch.session.id).not.toBe("stale");
+    expect(launch.session.responses).toEqual({ mass: 0.6, acceleration: 8 });
+  });
 });

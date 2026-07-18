@@ -2,7 +2,7 @@ import basketball from "./fixtures/basketball.json";
 import formula1 from "./fixtures/formula1.json";
 import space from "./fixtures/space.json";
 import { describe, expect, it } from "vitest";
-import { automaticallyCompletedStepIds, mergeCompletedStepIds } from "./completion";
+import { automaticallyCompletedStepIds, completionRulesSatisfied, mergeCompletedStepIds } from "./completion";
 import { calculateFormula } from "./formula-registry";
 import { buildProgressRequest, progressPercentage } from "./progress";
 import { validateSandboxSpec } from "./sandbox-validation";
@@ -50,5 +50,11 @@ describe("sandbox contract", () => {
   it("keeps a completed step after the value returns to its default", () => {
     const spec = validateSandboxSpec(basketball);
     expect(mergeCompletedStepIds(spec, ["step-1"], { mass: 0.6, acceleration: 8 }, [])).toEqual(["step-1"]);
+  });
+
+  it("matches backend submission rules before enabling completion", () => {
+    const spec = validateSandboxSpec(basketball);
+    expect(completionRulesSatisfied(spec, ["step-1", "step-2"], [])).toBe(false);
+    expect(completionRulesSatisfied(spec, ["step-1", "step-2", "step-3"], [{ question_id: "reflection-1", answer: "Force increases." }])).toBe(true);
   });
 });

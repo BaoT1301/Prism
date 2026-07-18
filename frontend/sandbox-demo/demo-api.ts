@@ -14,7 +14,7 @@ export interface DemoSandboxApi extends SandboxApi {
   reset(): void;
 }
 
-const DEMO_STORAGE_VERSION = "v2";
+const DEMO_STORAGE_VERSION = "v3";
 
 interface StoredDemoState {
   session: SandboxSession;
@@ -34,6 +34,19 @@ function createSession(spec: SandboxSpec): SandboxSession {
   };
 }
 
+function isCompatibleSession(spec: SandboxSpec, session: SandboxSession): boolean {
+  const stepIds = new Set(spec.guided_steps.map((step) => step.id));
+  const questionIds = new Set(spec.reflection_questions.map((question) => question.id));
+  return spec.variables.every((variable) => {
+    const value = session.responses[variable.id];
+    return typeof value === "number" && Number.isFinite(value) && value >= variable.min && value <= variable.max;
+  })
+    && session.completed_step_ids.every((stepId) => stepIds.has(stepId))
+    && session.reflection_answers.every((answer) => questionIds.has(answer.question_id))
+    && session.hints_used >= 0
+    && session.hints_used <= 3;
+}
+
 export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = window.localStorage): DemoSandboxApi {
   const storageKey = `prism-sandbox-demo:${DEMO_STORAGE_VERSION}:${spec.title}`;
   const readState = (): StoredDemoState | null => {
@@ -50,7 +63,7 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
   return {
     async startAssignment(_assignmentId: string): Promise<StartAssignmentResponse> {
       const existing = readState();
-      const state = existing ?? { session: createSession(spec) };
+      const state = existing && isCompatibleSession(spec, existing.session) ? existing : { session: createSession(spec) };
       writeState(state);
       return {
         generated_assignment: {

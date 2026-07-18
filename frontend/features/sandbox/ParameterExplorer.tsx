@@ -8,7 +8,7 @@ import { ReflectionForm } from "../../components/sandbox/ReflectionForm";
 import { SaveStatus } from "../../components/sandbox/SaveStatus";
 import { VariableSlider } from "../../components/sandbox/VariableSlider";
 import { SandboxApiError, type SandboxApi } from "../../lib/sandbox/sandbox-api";
-import { mergeCompletedStepIds } from "./completion";
+import { completionRulesSatisfied, mergeCompletedStepIds } from "./completion";
 import { calculateFormula } from "./formula-registry";
 import { evaluateMission } from "./mission";
 import { buildProgressRequest, progressPercentage } from "./progress";
@@ -56,7 +56,9 @@ export function ParameterExplorer({
   const result = useMemo(() => calculateFormula(spec.formula_id, values), [spec.formula_id, values]);
   const missionEvaluation = spec.mission ? evaluateMission(spec, values) : undefined;
   const percentage = progressPercentage(spec.guided_steps, completedStepIds);
-  const missionComplete = missionEvaluation?.complete || Boolean(session.mission_evaluation?.complete) || (!spec.mission && percentage === 100);
+  const guidedCompletionReady = completionRulesSatisfied(spec, completedStepIds, reflectionAnswers);
+  const missionComplete = spec.mission ? Boolean(session.mission_evaluation?.complete) : guidedCompletionReady;
+  const submissionReady = guidedCompletionReady && missionComplete;
 
   useEffect(() => {
     setCompletedStepIds((current) => {
@@ -154,7 +156,7 @@ export function ParameterExplorer({
       <main className="sandbox-main">
         <section className="mission-hero">
           <div><p className="eyebrow">Experiment 01 · Parameter explorer</p><h1>{spec.title}</h1><p className="mission-intro">{spec.introduction}</p></div>
-          <div className="mission-status"><span className="status-dot" />{missionComplete ? (spec.mission ? "Mission complete" : "Experiment complete") : (spec.mission ? "Mission in progress" : `${percentage}% explored`)}</div>
+          <div className="mission-status"><span className="status-dot" />{missionComplete ? (spec.mission ? "Mission complete" : "Experiment complete") : (spec.mission && missionEvaluation?.complete ? "Ready to record" : spec.mission ? "Mission in progress" : `${percentage}% explored`)}</div>
         </section>
 
         <div className="sandbox-dashboard">
@@ -187,7 +189,7 @@ export function ParameterExplorer({
         </section>
 
         {spec.mission && missionEvaluation && <section className="mission-card">
-          <div className="section-heading"><div><p className="card-kicker">Mission progress</p><h2>{spec.mission.title}</h2></div><strong className="progress-label">{missionComplete ? "Complete" : "In progress"}</strong></div>
+          <div className="section-heading"><div><p className="card-kicker">Mission progress</p><h2>{spec.mission.title}</h2></div><strong className="progress-label">{missionComplete ? "Complete" : missionEvaluation.complete ? "Ready" : "In progress"}</strong></div>
           <p className="mission-context">{spec.mission.context}</p>
           <div className="mission-constraints">{missionEvaluation.constraints.map((constraint) => <div className={constraint.satisfied ? "constraint is-satisfied" : "constraint"} key={constraint.id}><span aria-hidden="true">{constraint.satisfied ? "✓" : "○"}</span><div><strong>{constraint.label}</strong><small>{constraint.current_value === null ? "Run an experiment to see the current value." : `${constraint.current_value} · ${constraint.message}`}</small></div></div>)}</div>
           {missionComplete && spec.mission.bonus_condition.enabled && <div className="bonus-panel"><strong>Optional extension</strong><p>{spec.mission.bonus_condition.description}</p>{bonusAttempted && <small>Second valid solution recorded.</small>}</div>}
@@ -197,7 +199,7 @@ export function ParameterExplorer({
         {submitError && <p className="notice" role="alert">{submitError}</p>}
         <div className="completion-bar">
           <SaveStatus status={saveStatus} />
-          <div><p>{missionComplete ? "Every experiment step is complete." : "Finish the checklist and reflection to complete the mission."}</p><button className="complete-button" type="button" disabled={submitting || session.status === "submitted" || !missionComplete} onClick={() => void submit()}>{session.status === "submitted" ? "Mission complete" : submitting ? "Saving mission..." : "Complete mission →"}</button></div>
+          <div><p>{submissionReady ? "Every required step is complete and recorded." : spec.mission && missionEvaluation?.complete ? "Record this successful experiment, then finish the checklist and reflection." : "Finish the checklist, reflection, and recorded experiment to complete the mission."}</p><button className="complete-button" type="button" disabled={submitting || session.status === "submitted" || !submissionReady} onClick={() => void submit()}>{session.status === "submitted" ? "Mission complete" : submitting ? "Saving mission..." : "Complete mission →"}</button></div>
         </div>
       </main>
     </div>

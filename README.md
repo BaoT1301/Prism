@@ -27,7 +27,7 @@ Open the Vite URL shown by the command (normally http://localhost:5173). Set
 Clerk sign-in and the authenticated teacher/student flows. The backend also needs
 the Clerk variables listed in `.env.example`.
 
-The standalone sandbox demo remains fixture-backed, but the main application uses
+The standalone sandbox demo at `/sandbox-demo.html` remains fixture-backed, but the main application uses
 the shared Clerk client and launches the sandbox against the authenticated API.
 
 Run checks:
