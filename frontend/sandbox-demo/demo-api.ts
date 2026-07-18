@@ -1,4 +1,6 @@
 import { SandboxApiError, type SandboxApi } from "../lib/sandbox/sandbox-api";
+import { automaticallyCompletedStepIds, completionRulesSatisfied } from "../features/sandbox/completion";
+import { evaluateMission } from "../features/sandbox/mission";
 import type {
   HintResponse,
   ProgressRequest,
@@ -98,12 +100,26 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
       if (state.session.version !== request.expected_version) {
         throw new SandboxApiError(409, "SESSION_VERSION_CONFLICT", "The demo session has a newer version.");
       }
-      state.session = {
+      const completedStepIds = [...new Set([...request.completed_step_ids, ...automaticallyCompletedStepIds(spec, request.responses, request.reflection_answers)])].sort();
+      const nextSession: SandboxSession = {
         ...state.session,
-        version: state.session.version + 1,
-        completed_step_ids: request.completed_step_ids,
+        completed_step_ids: completedStepIds,
         responses: request.responses,
         reflection_answers: request.reflection_answers,
+      };
+      if (!isCompatibleSession(spec, nextSession)) {
+        throw new SandboxApiError(422, "INVALID_PROGRESS", "Demo progress must match the active sandbox specification.");
+      }
+      const missionEvaluation = spec.mission ? evaluateMission(spec, request.responses) : undefined;
+      const events = [...(state.session.interaction_events ?? [])];
+      if (request.experiment_event) {
+        events.push({ ...request.experiment_event, outputs: missionEvaluation?.outputs, mission_complete: Boolean(missionEvaluation?.complete) });
+      }
+      state.session = {
+        ...nextSession,
+        version: state.session.version + 1,
+        mission_evaluation: missionEvaluation,
+        interaction_events: events.slice(-20),
         updated_at: new Date().toISOString(),
       };
       writeState(state);
@@ -138,6 +154,11 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
       if (state.submission) return state.submission;
       if (state.session.version !== expectedSessionVersion) {
         throw new SandboxApiError(409, "SESSION_VERSION_CONFLICT", "The demo session has a newer version.");
+      }
+      const rulesSatisfied = completionRulesSatisfied(spec, state.session.completed_step_ids, reflectionAnswers);
+      const recordedMissionComplete = !spec.mission || Boolean(state.session.interaction_events?.some((event) => event.event_type === "experiment_run" && event.mission_complete));
+      if (!rulesSatisfied || !recordedMissionComplete) {
+        throw new SandboxApiError(409, "SANDBOX_INCOMPLETE", "Complete the required steps and record a successful experiment before submitting.");
       }
       const submission: SubmissionResponse = {
         id: crypto.randomUUID(),

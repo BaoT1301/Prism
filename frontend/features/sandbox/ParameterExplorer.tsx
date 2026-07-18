@@ -57,7 +57,8 @@ export function ParameterExplorer({
   const missionEvaluation = spec.mission ? evaluateMission(spec, values) : undefined;
   const percentage = progressPercentage(spec.guided_steps, completedStepIds);
   const guidedCompletionReady = completionRulesSatisfied(spec, completedStepIds, reflectionAnswers);
-  const missionComplete = spec.mission ? Boolean(session.mission_evaluation?.complete) : guidedCompletionReady;
+  const recordedMissionComplete = Boolean(session.interaction_events?.some((event) => event.event_type === "experiment_run" && event.mission_complete));
+  const missionComplete = spec.mission ? recordedMissionComplete : guidedCompletionReady;
   const submissionReady = guidedCompletionReady && missionComplete;
 
   useEffect(() => {

@@ -491,6 +491,9 @@ parameter explorer. It accepts only `event_type: "experiment_run"`, `recorded_at
 an optional `elapsed_ms`, the configured numeric `values`, and
 `controlled_comparison`. The server calculates outputs and mission completion; clients
 cannot supply either value. Session history retains at most 20 events.
+For a sandbox with `mission`, submission also requires at least one recorded
+`experiment_run` that the server evaluated as successful. Sandboxes without a mission
+keep the original guided-step completion behavior.
 
 `sandbox_spec.mission` is an optional backward-compatible enhancement. New
 personalized assignments may include it to expose deterministic numeric constraints;

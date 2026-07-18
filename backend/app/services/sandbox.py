@@ -55,6 +55,11 @@ def submission_ready(spec: dict[str, Any], completed_step_ids: set[str], reflect
     return bool(spec.get("completion_rules"))
 
 
+def has_successful_mission_run(events: list[dict[str, Any]]) -> bool:
+    """Require a recorded, server-evaluated successful run for mission-enhanced sandboxes."""
+    return any(event.get("event_type") == "experiment_run" and event.get("mission_complete") is True for event in events)
+
+
 def build_progressive_hint(
     spec: dict[str, Any],
     responses: dict[str, Any],

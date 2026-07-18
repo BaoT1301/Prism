@@ -30,7 +30,7 @@ from app.schemas.sessions import (
     SubmissionResponse,
     SubmitRequest,
 )
-from app.services.sandbox import automatic_step_ids, build_progressive_hint, submission_ready
+from app.services.sandbox import automatic_step_ids, build_progressive_hint, has_successful_mission_run, submission_ready
 from app.services.feedback import build_adaptive_feedback
 from app.services.hints import OpenAIHintProvider, fallback_hint
 from app.services.mission import evaluate_mission
@@ -152,7 +152,9 @@ def submit(session_id: uuid.UUID, data: SubmitRequest, db: Annotated[Session, De
     answer_map = {answer.question_id: answer.answer for answer in data.reflection_answers}
     completed_step_ids = sorted(set(item.completed_step_ids) | automatic_step_ids(spec, item.responses, answer_map))
     mission_evaluation = evaluate_mission(spec, item.responses) if spec.get("mission") else None
-    if (mission_evaluation is not None and not mission_evaluation["complete"]) or not submission_ready(spec, set(completed_step_ids), answer_map):
+    events = list((item.progress or {}).get("interaction_events", []))
+    mission_run_ready = mission_evaluation is None or has_successful_mission_run(events)
+    if (mission_evaluation is not None and not mission_evaluation["complete"]) or not mission_run_ready or not submission_ready(spec, set(completed_step_ids), answer_map):
         raise ApiError(409, "SANDBOX_INCOMPLETE", "Complete the required steps and reflections before submitting.")
     item.completed_step_ids = completed_step_ids
     item.progress = {**(item.progress or {}), "completed_step_ids": completed_step_ids, "responses": item.responses, "reflection_answers": answer_data}

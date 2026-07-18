@@ -218,7 +218,11 @@ def test_teacher_assignment_progress_shows_every_member_without_grading(domain_d
 
     answers = [{"question_id": "reflection-1", "answer": "Force increases."}]
     update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers), db, student)
-    submit(session.id, SubmitRequest(expected_session_version=2, reflection_answers=answers), db, student)
+    with pytest.raises(ApiError) as error:
+        submit(session.id, SubmitRequest(expected_session_version=2, reflection_answers=answers), db, student)
+    assert error.value.detail["code"] == "SANDBOX_INCOMPLETE"
+    update_progress(session.id, ProgressRequest(expected_version=2, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers, experiment_event={"event_type": "experiment_run", "recorded_at": "2026-07-18T12:00:00Z", "values": {"mass": 2, "acceleration": 6}, "controlled_comparison": True}), db, student)
+    submit(session.id, SubmitRequest(expected_session_version=3, reflection_answers=answers), db, student)
 
     completed = assignment_progress(assignment.id, db, teacher)
     student_row = next(item for item in completed["items"] if item["student_id"] == student.id)
