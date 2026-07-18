@@ -13,8 +13,10 @@
     "@clerk/react": "^6.12.5",
     "@fontsource/dm-sans": "^5.2.6",
     "@fontsource/dm-serif-display": "^5.2.6",
+    "@types/three": "^0.185.1",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "three": "^0.185.1"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",

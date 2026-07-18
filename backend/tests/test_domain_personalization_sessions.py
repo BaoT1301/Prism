@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from app.api.routes.personalization import start_assignment
@@ -84,6 +86,9 @@ def test_fixture_generation_is_valid_cached_and_session_safe(domain_db):
     assert cache == "miss" and generated.sandbox_spec["sandbox_type"] == "parameter_explorer"
     assert generated.reflection_questions == generated.sandbox_spec["reflection_questions"]
     assert provider.start(db, assignment, student, interests)[2] == "hit"
+    cached_content = asyncio.run(FixturePersonalizationProvider().generate(assignment, interests))
+    cached_content.sandbox_spec.pop("mission")
+    provider.validate(assignment, cached_content)
     with pytest.raises(ApiError):
         owned_session(db, session.id, other_student)
 
@@ -144,10 +149,11 @@ def test_progress_hints_and_idempotent_submission(domain_db):
     interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
     _, session, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
     answers = [{"question_id": "reflection-1", "answer": "Force increases."}]
-    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers), db, student)
+    updated = update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["set-mass"], responses={"mass": 2, "acceleration": 6}, reflection_answers=answers, experiment_event={"event_type": "experiment_run", "recorded_at": "2026-07-18T12:00:00Z", "elapsed_ms": 1000, "values": {"mass": 2, "acceleration": 6}, "controlled_comparison": True}), db, student)
     assert updated["version"] == 2
     assert updated["reflection_answers"] == [{"question_id": "reflection-1", "answer": "Force increases."}]
     assert "explain-force" in updated["completed_step_ids"]
+    assert updated["interaction_events"] == [{"event_type": "experiment_run", "recorded_at": "2026-07-18T12:00:00Z", "elapsed_ms": 1000, "values": {"mass": 2.0, "acceleration": 6.0}, "controlled_comparison": True, "outputs": {"force": 12.0}, "mission_complete": True}]
     with pytest.raises(ApiError):
         update_progress(session.id, ProgressRequest(expected_version=1, completed_step_ids=["bad"], responses={}), db, student)
     with pytest.raises(ApiError):

@@ -486,6 +486,17 @@ Response:
 
 Use optimistic concurrency to prevent stale updates. A mismatched `expected_version` returns `409 SESSION_VERSION_CONFLICT`.
 
+`experiment_event` is an optional, bounded telemetry object for the mission-enhanced
+parameter explorer. It accepts only `event_type: "experiment_run"`, `recorded_at`,
+an optional `elapsed_ms`, the configured numeric `values`, and
+`controlled_comparison`. The server calculates outputs and mission completion; clients
+cannot supply either value. Session history retains at most 20 events.
+
+`sandbox_spec.mission` is an optional backward-compatible enhancement. New
+personalized assignments may include it to expose deterministic numeric constraints;
+cached assignments without it continue to use the original guided-step completion
+rules and remain submit-able.
+
 ### POST `/sandbox-sessions/{session_id}/hint`
 
 Student owner only.

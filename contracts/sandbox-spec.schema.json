@@ -12,8 +12,7 @@
     "formula_id",
     "variables",
     "guided_steps",
-    "completion_rules",
-    "mission"
+    "completion_rules"
   ],
   "properties": {
     "version": {

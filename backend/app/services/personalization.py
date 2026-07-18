@@ -87,13 +87,17 @@ class FixturePersonalizationProvider:
             "formula1": ("Formula 1", "Vehicle mass setting", "Acceleration setting", "formula1-force-v1"),
             "space": ("Space", "Payload mass setting", "Launch acceleration setting", "space-force-v1"),
         }[visual_theme]
+        reflection_question = {
+            "id": "reflection-1",
+            "question": "How did changing acceleration affect force while mass stayed constant?",
+        }
         return GeneratedContent(
             personalized_title=f"{context} Force Mission",
             scenario=f"Explore Newton's Second Law through a normalized {context.lower()} model.",
             problem_statement="Adjust the mass and acceleration settings to produce a target force while meeting every constraint.",
             learning_objective=assignment.learning_objective,
             instructions=["Read the mission constraints.", "Run experiments with mass and acceleration.", "Find one valid configuration and explain the pattern."],
-            reflection_questions=[ReflectionQuestion(id="reflection-1", question="How did changing acceleration affect force while mass stayed constant?")],
+            reflection_questions=[ReflectionQuestion(**reflection_question)],
             sandbox_spec={
                 "version": 1, "sandbox_type": "parameter_explorer", "visual_theme": visual_theme, "title": f"{context} Force Mission",
                 "introduction": f"Use this normalized {context.lower()} scenario to explore force.", "formula_id": "force_equals_mass_times_acceleration",
@@ -107,7 +111,7 @@ class FixturePersonalizationProvider:
                     {"id": "explain-force", "instruction": "Explain how acceleration affects force.", "completion_checks": [{"type": "reflection_answered", "question_id": "reflection-1"}]},
                 ],
                 "completion_rules": [{"type": "all_steps_completed"}],
-                "reflection_questions": [{"id": "reflection-1", "question": "How did changing acceleration affect force?"}],
+                "reflection_questions": [reflection_question],
                 "mission": {
                     "schema_version": "1.0", "evaluator_version": "numeric-v1", "template_id": template_id,
                     "title": f"{context} Force Mission",
@@ -176,10 +180,11 @@ class PersonalizationService:
         errors = list(Draft202012Validator(SANDBOX_SCHEMA).iter_errors(content.sandbox_spec))
         if errors:
             raise ApiError(502, "INVALID_AI_OUTPUT", "Generated sandbox configuration is invalid.")
-        try:
-            validate_mission(content.sandbox_spec)
-        except ValueError as exc:
-            raise ApiError(502, "INVALID_AI_OUTPUT", "Generated mission configuration is invalid.") from exc
+        if "mission" in content.sandbox_spec:
+            try:
+                validate_mission(content.sandbox_spec)
+            except ValueError as exc:
+                raise ApiError(502, "INVALID_AI_OUTPUT", "Generated mission configuration is invalid.") from exc
         sandbox_questions = content.sandbox_spec.get("reflection_questions", [])
         if [question.model_dump() for question in content.reflection_questions] != sandbox_questions:
             raise ApiError(502, "INVALID_AI_OUTPUT", "Generated reflection questions do not match the sandbox configuration.")

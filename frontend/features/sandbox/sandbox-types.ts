@@ -86,7 +86,8 @@ export interface SandboxSpec {
   guided_steps: GuidedStep[];
   completion_rules: CompletionRule[];
   reflection_questions: ReflectionQuestion[];
-  mission: SandboxMission;
+  /** Optional so existing cached assignments remain usable after the mission enhancement. */
+  mission?: SandboxMission;
 }
 
 export interface SandboxSession {
@@ -109,10 +110,19 @@ export interface InteractionEvent {
   recorded_at: string;
   elapsed_ms?: number;
   values?: Record<string, number>;
+  controlled_comparison?: boolean;
+  /** Server-calculated fields returned in session history, never sent by the client. */
   outputs?: Record<string, number>;
   mission_complete?: boolean;
-  controlled_comparison?: boolean;
   bonus_attempted?: boolean;
+}
+
+export interface ExperimentEventRequest {
+  event_type: "experiment_run";
+  recorded_at: string;
+  elapsed_ms?: number;
+  values: Record<string, number>;
+  controlled_comparison?: boolean;
 }
 
 export interface AdaptiveFeedback {
@@ -154,7 +164,7 @@ export interface ProgressRequest {
   completed_step_ids: string[];
   responses: Record<string, number>;
   reflection_answers: ReflectionAnswer[];
-  experiment_event?: InteractionEvent;
+  experiment_event?: ExperimentEventRequest;
 }
 
 export interface ProgressResponse extends SandboxSession {

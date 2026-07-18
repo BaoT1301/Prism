@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 
 import { PrismBrand } from "../../components/AppChrome";
 import { CompletionScreen } from "../../components/sandbox/CompletionScreen";
@@ -11,8 +11,13 @@ import { SandboxApiError, type SandboxApi } from "../../lib/sandbox/sandbox-api"
 import { mergeCompletedStepIds } from "./completion";
 import { calculateFormula } from "./formula-registry";
 import { evaluateMission } from "./mission";
-import { buildProgressRequest } from "./progress";
+import { buildProgressRequest, progressPercentage } from "./progress";
 import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec } from "./sandbox-types";
+
+const ThreePhysicsScene = lazy(async () => {
+  const module = await import("../../components/sandbox/ThreePhysicsScene");
+  return { default: module.ThreePhysicsScene };
+});
 
 export function ParameterExplorer({
   spec,
@@ -42,13 +47,15 @@ export function ParameterExplorer({
   const [lastRunAt, setLastRunAt] = useState(() => Date.now());
   const [firstSolution, setFirstSolution] = useState<Record<string, number> | undefined>();
   const [bonusAttempted, setBonusAttempted] = useState(false);
+  const [hasThreeDimension, setHasThreeDimension] = useState(false);
   const firstRender = useRef(true);
   const sessionRef = useRef(initialSession);
   const saveGenerationRef = useRef(0);
   sessionRef.current = session;
   const result = useMemo(() => calculateFormula(spec.formula_id, values), [spec.formula_id, values]);
-  const missionEvaluation = evaluateMission(spec, values);
-  const missionComplete = missionEvaluation.complete || Boolean(session.mission_evaluation?.complete);
+  const missionEvaluation = spec.mission ? evaluateMission(spec, values) : undefined;
+  const percentage = progressPercentage(spec.guided_steps, completedStepIds);
+  const missionComplete = missionEvaluation?.complete || Boolean(session.mission_evaluation?.complete) || (!spec.mission && percentage === 100);
 
   useEffect(() => {
     setCompletedStepIds((current) => {
@@ -106,16 +113,15 @@ export function ParameterExplorer({
   }
 
   async function runExperiment() {
+    if (!spec.mission || !missionEvaluation) return;
     const now = Date.now();
-    const evaluation = evaluateMission(spec, values);
+    const evaluation = missionEvaluation;
     if (evaluation.complete && !firstSolution) setFirstSolution(values);
     const event = {
       event_type: "experiment_run" as const,
       recorded_at: new Date(now).toISOString(),
       elapsed_ms: now - lastRunAt,
       values,
-      mission_complete: evaluation.complete,
-      bonus_attempted: Boolean(firstSolution),
       controlled_comparison: true,
     };
     try {
@@ -143,13 +149,14 @@ export function ParameterExplorer({
       <main className="sandbox-main">
         <section className="mission-hero">
           <div><p className="eyebrow">Experiment 01 · Parameter explorer</p><h1>{spec.title}</h1><p className="mission-intro">{spec.introduction}</p></div>
-          <div className="mission-status"><span className="status-dot" />{missionComplete ? "Mission complete" : "Mission in progress"}</div>
+          <div className="mission-status"><span className="status-dot" />{missionComplete ? (spec.mission ? "Mission complete" : "Experiment complete") : (spec.mission ? "Mission in progress" : `${percentage}% explored`)}</div>
         </section>
 
         <div className="sandbox-dashboard">
           <div className="simulation-column">
-            <PhysicsScene spec={spec} values={values} runToken={runToken} />
-            <button className="primary-button mission-run-button" type="button" onClick={() => void runExperiment()}>Run and record experiment</button>
+            <Suspense fallback={null}><ThreePhysicsScene spec={spec} values={values} runToken={runToken} active={hasThreeDimension} onAvailability={setHasThreeDimension} /></Suspense>
+            {!hasThreeDimension && <PhysicsScene spec={spec} values={values} runToken={runToken} />}
+            {spec.mission && <button className="primary-button mission-run-button" type="button" onClick={() => void runExperiment()}>Run and record experiment</button>}
             <div className="simulation-action"><div><p className="card-kicker">Ready when you are</p><strong>Change a variable, then run the experiment.</strong></div><button className="primary-button" type="button" onClick={() => setRunToken((token) => token + 1)}>Run experiment <span aria-hidden="true">→</span></button></div>
           </div>
           <aside className="coach-column">
@@ -165,12 +172,12 @@ export function ParameterExplorer({
           <div className="physics-hud"><div><span>Mass</span><strong>{values.mass} <small>kg</small></strong></div><div><span>Acceleration</span><strong>{values.acceleration} <small>m/s²</small></strong></div><div className="hud-force"><span>Force</span><strong>{result.toFixed(2)} <small>N</small></strong></div></div>
         </section>
 
-        <section className="mission-card">
+        {spec.mission && missionEvaluation && <section className="mission-card">
           <div className="section-heading"><div><p className="card-kicker">Mission progress</p><h2>{spec.mission.title}</h2></div><strong className="progress-label">{missionComplete ? "Complete" : "In progress"}</strong></div>
           <p className="mission-context">{spec.mission.context}</p>
           <div className="mission-constraints">{missionEvaluation.constraints.map((constraint) => <div className={constraint.satisfied ? "constraint is-satisfied" : "constraint"} key={constraint.id}><span aria-hidden="true">{constraint.satisfied ? "✓" : "○"}</span><div><strong>{constraint.label}</strong><small>{constraint.current_value === null ? "Run an experiment to see the current value." : `${constraint.current_value} · ${constraint.message}`}</small></div></div>)}</div>
           {missionComplete && spec.mission.bonus_condition.enabled && <div className="bonus-panel"><strong>Optional extension</strong><p>{spec.mission.bonus_condition.description}</p>{bonusAttempted && <small>Second valid solution recorded.</small>}</div>}
-        </section>
+        </section>}
 
         <ReflectionForm questions={spec.reflection_questions} answers={reflectionAnswers} onChange={setReflectionAnswers} />
         {submitError && <p className="notice" role="alert">{submitError}</p>}

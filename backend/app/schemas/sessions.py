@@ -17,12 +17,25 @@ class ReflectionAnswer(BaseModel):
         return value.strip()
 
 
+class ExperimentEventRequest(BaseModel):
+    """Client-provided details for one recorded experiment.
+
+    Derived outputs and completion state are intentionally calculated by the server.
+    """
+
+    event_type: Literal["experiment_run"]
+    recorded_at: datetime
+    elapsed_ms: int | None = Field(default=None, ge=0, le=3_600_000)
+    values: dict[str, float] = Field(default_factory=dict, max_length=4)
+    controlled_comparison: bool = False
+
+
 class ProgressRequest(BaseModel):
     expected_version: int = Field(ge=1)
     completed_step_ids: list[str] = Field(max_length=8)
     responses: dict[str, Any] = Field(default_factory=dict)
     reflection_answers: list[ReflectionAnswer] = Field(default_factory=list, max_length=5)
-    experiment_event: dict[str, Any] | None = None
+    experiment_event: ExperimentEventRequest | None = None
 
 
 class HintRequest(BaseModel):

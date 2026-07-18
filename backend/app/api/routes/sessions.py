@@ -30,7 +30,7 @@ from app.schemas.sessions import (
     SubmissionResponse,
     SubmitRequest,
 )
-from app.services.sandbox import automatic_step_ids, submission_ready
+from app.services.sandbox import automatic_step_ids, build_progressive_hint, submission_ready
 from app.services.feedback import build_adaptive_feedback
 from app.services.hints import OpenAIHintProvider, fallback_hint
 from app.services.mission import evaluate_mission
@@ -90,16 +90,20 @@ def update_progress(session_id: uuid.UUID, data: ProgressRequest, db: Annotated[
         variable = valid_variables.get(key)
         if variable is None or not isinstance(value, (int, float)) or not variable["min"] <= value <= variable["max"]:
             raise ApiError(422, "INVALID_RESPONSE", "Responses must match configured variable ranges.")
-    mission_evaluation = evaluate_mission(spec, data.responses)
+    mission_evaluation = evaluate_mission(spec, data.responses) if spec.get("mission") else None
     progress = dict(item.progress or {})
-    events = list(progress.get("interaction_events", []))
+    events = list(progress.get("interaction_events", []))[-19:]
     if data.experiment_event:
-        event = dict(data.experiment_event)
-        event.setdefault("event_type", "experiment_run")
-        event["outputs"] = mission_evaluation["outputs"]
-        event["mission_complete"] = mission_evaluation["complete"]
+        event = data.experiment_event.model_dump(mode="json")
+        outputs = evaluate_mission(spec, data.responses)["outputs"]
+        event["outputs"] = outputs
+        event["mission_complete"] = bool(mission_evaluation and mission_evaluation["complete"])
         events.append(event)
-    progress.update({"completed_step_ids": completed_step_ids, "responses": data.responses, "reflection_answers": answer_data, "mission_evaluation": mission_evaluation, "interaction_events": events})
+    progress.update({"completed_step_ids": completed_step_ids, "responses": data.responses, "reflection_answers": answer_data, "interaction_events": events})
+    if mission_evaluation is not None:
+        progress["mission_evaluation"] = mission_evaluation
+    else:
+        progress.pop("mission_evaluation", None)
     result = db.execute(update(SandboxSession).where(SandboxSession.id == item.id, SandboxSession.version == data.expected_version).values(completed_step_ids=completed_step_ids, responses=data.responses, progress=progress, attempt_count=SandboxSession.attempt_count + (1 if data.experiment_event else 0), version=SandboxSession.version + 1))
     if result.rowcount != 1:
         db.rollback()
@@ -117,14 +121,15 @@ def hint(session_id: uuid.UUID, data: HintRequest, db: Annotated[Session, Depend
     item.hints_used += 1
     events = list((item.progress or {}).get("interaction_events", []))
     settings = get_settings()
-    hint_text = fallback_hint(generated.sandbox_spec or {}, item.responses, events, item.hints_used)
-    if settings.openai_api_key and not settings.demo_mode:
+    spec = generated.sandbox_spec or {}
+    hint_text = fallback_hint(spec, item.responses, events, item.hints_used) if spec.get("mission") else build_progressive_hint(spec, item.responses, item.completed_step_ids, item.hints_used, data.current_step_id)
+    if spec.get("mission") and settings.openai_api_key and not settings.demo_mode:
         try:
-            hint_text = OpenAIHintProvider(settings).generate_sync(generated.sandbox_spec or {}, item.responses, events, item.hints_used)
+            hint_text = OpenAIHintProvider(settings).generate_sync(spec, item.responses, events, item.hints_used)
         except Exception:
             pass
     events.append({"event_type": "hint_requested", "recorded_at": datetime.now(UTC).isoformat(), "hint_level": item.hints_used})
-    item.progress = {**(item.progress or {}), "interaction_events": events}
+    item.progress = {**(item.progress or {}), "interaction_events": events[-20:]}
     db.commit()
     db.refresh(item)
     return {"hint_level": item.hints_used, "hint": hint_text, "remaining_hint_levels": 3 - item.hints_used}
@@ -146,15 +151,17 @@ def submit(session_id: uuid.UUID, data: SubmitRequest, db: Annotated[Session, De
     answer_data = [answer.model_dump() for answer in data.reflection_answers]
     answer_map = {answer.question_id: answer.answer for answer in data.reflection_answers}
     completed_step_ids = sorted(set(item.completed_step_ids) | automatic_step_ids(spec, item.responses, answer_map))
-    mission_evaluation = evaluate_mission(spec, item.responses)
-    if not mission_evaluation["complete"] or not submission_ready(spec, set(completed_step_ids), answer_map):
+    mission_evaluation = evaluate_mission(spec, item.responses) if spec.get("mission") else None
+    if (mission_evaluation is not None and not mission_evaluation["complete"]) or not submission_ready(spec, set(completed_step_ids), answer_map):
         raise ApiError(409, "SANDBOX_INCOMPLETE", "Complete the required steps and reflections before submitting.")
     item.completed_step_ids = completed_step_ids
-    item.progress = {**(item.progress or {}), "completed_step_ids": completed_step_ids, "responses": item.responses, "reflection_answers": answer_data, "mission_evaluation": mission_evaluation}
+    item.progress = {**(item.progress or {}), "completed_step_ids": completed_step_ids, "responses": item.responses, "reflection_answers": answer_data}
+    if mission_evaluation is not None:
+        item.progress["mission_evaluation"] = mission_evaluation
     submission = Submission(assignment_id=generated.assignment_id, generated_assignment_id=generated.id, session_id=item.id, student_id=student.id, responses_snapshot=item.responses, reflection_answers=answer_data)
     item.status = SandboxSessionStatus.SUBMITTED
     item.submitted_at = datetime.now(UTC)
-    item.progress["feedback"] = build_adaptive_feedback(item, mission_evaluation)
+    item.progress["feedback"] = build_adaptive_feedback(item, mission_evaluation) if mission_evaluation is not None else None
     db.add(submission)
     db.commit()
     db.refresh(submission)

@@ -85,7 +85,8 @@ export function validateSandboxSpec(value: unknown): SandboxSpec {
     }
   }
   const mission = candidate.mission;
-  if (!mission || mission.schema_version !== "1.0" || mission.evaluator_version !== "numeric-v1") throw new Error("Sandbox mission is invalid.");
+  if (mission === undefined) return { ...candidate, reflection_questions: questions } as SandboxSpec;
+  if (mission.schema_version !== "1.0" || mission.evaluator_version !== "numeric-v1") throw new Error("Sandbox mission is invalid.");
   if (!mission.title || !mission.context || !mission.objective || !mission.template_id) throw new Error("Sandbox mission content is incomplete.");
   if (!Array.isArray(mission.controls) || mission.controls.length === 0 || mission.controls.some((control) => !variableIds.has(control.variable_id))) throw new Error("Mission controls reference unknown variables.");
   if (!Array.isArray(mission.calculated_outputs) || !mission.calculated_outputs.some((output) => output.id === "force" && output.formula_id === candidate.formula_id)) throw new Error("Mission outputs are invalid.");

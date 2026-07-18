@@ -12,6 +12,12 @@ describe("sandbox contract", () => {
     expect(validateSandboxSpec(fixture).sandbox_type).toBe("parameter_explorer");
   });
 
+  it("accepts a cached pre-mission sandbox specification", () => {
+    const cachedSpec: Record<string, unknown> = structuredClone(basketball);
+    delete cachedSpec.mission;
+    expect(validateSandboxSpec(cachedSpec).mission).toBeUndefined();
+  });
+
   it("calculates force only through the known formula registry", () => {
     expect(calculateFormula("force_equals_mass_times_acceleration", { mass: 0.6, acceleration: 8 })).toBe(4.8);
   });

@@ -2,8 +2,11 @@ import { calculateFormula } from "./formula-registry";
 import type { MissionEvaluation, SandboxSpec } from "./sandbox-types";
 
 export function evaluateMission(spec: SandboxSpec, values: Record<string, number>): MissionEvaluation {
-  const outputs = { force: calculateFormula(spec.formula_id, values) };
-  const current = { ...values, ...outputs };
+  if (!spec.mission) {
+    return { complete: false, outputs: { force: calculateFormula(spec.formula_id, values) }, constraints: [], bonus: { enabled: false, complete: false, attempted: false } };
+  }
+  const outputs: Record<string, number> = { force: calculateFormula(spec.formula_id, values) };
+  const current: Record<string, number> = { ...values, ...outputs };
   const constraints = spec.mission.visible_constraints.map((constraint) => {
     const value = current[constraint.field];
     const satisfied = typeof value === "number" && (
