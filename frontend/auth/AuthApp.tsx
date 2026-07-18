@@ -51,8 +51,8 @@ export function AuthApp() {
     return <main className="loading-screen"><span className="loading-mark" aria-hidden="true" /><p>Opening your Prism workspace...</p></main>;
   }
 
-  const isSignInRoute = route.startsWith("#/sign-in");
-  const isLandingRoute = !isSignedIn ? !isSignInRoute : route === "#/welcome";
+  const isAuthRoute = route.startsWith("#/sign-in") || route.startsWith("#/sign-up");
+  const isLandingRoute = !isSignedIn ? !isAuthRoute : route === "#/welcome";
 
   if (isLandingRoute) {
     return <LandingPage isSignedIn={Boolean(isSignedIn)} onEnter={() => { location.hash = isSignedIn ? "#/" : "#/sign-in"; }} />;
@@ -66,7 +66,7 @@ export function AuthApp() {
           <h2>Step into your classroom.</h2>
           <p>Sign in or create an account. Your work will be right where you left it.</p>
         </div>
-        <SignIn withSignUp fallbackRedirectUrl="/" signUpFallbackRedirectUrl="/" />
+        <SignIn routing="hash" withSignUp fallbackRedirectUrl="/" signUpFallbackRedirectUrl="/" />
       </AuthLayout>
     );
   }
