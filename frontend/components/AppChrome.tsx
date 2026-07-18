@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 export function PrismBrand({ compact = false }: { compact?: boolean }) {
   return (
-    <a className="prism-brand" href="#/" aria-label="Prism home">
+    <a className="prism-brand" href="/#/welcome" aria-label="Prism home">
       <span className="prism-mark" aria-hidden="true">
         <i />
         <i />
