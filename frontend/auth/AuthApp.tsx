@@ -2,6 +2,7 @@ import { type FormEvent, type ReactNode, useEffect, useState } from "react";
 import { SignIn, useAuth } from "@clerk/react";
 
 import { PrismBrand } from "../components/AppChrome";
+import { LandingPage } from "../components/LandingPage";
 import { StudentApp } from "../features/student/StudentApp";
 import { TeacherApp } from "../features/teacher/TeacherApp";
 import { apiRequest } from "../lib/api-client";
@@ -38,9 +39,23 @@ function AuthLayout({ children, eyebrow = "Learning, made personal" }: { childre
 
 export function AuthApp() {
   const { getToken, isLoaded, isSignedIn, signOut } = useAuth();
+  const [route, setRoute] = useState(() => location.hash);
+
+  useEffect(() => {
+    const updateRoute = () => setRoute(location.hash);
+    addEventListener("hashchange", updateRoute);
+    return () => removeEventListener("hashchange", updateRoute);
+  }, []);
 
   if (!isLoaded) {
     return <main className="loading-screen"><span className="loading-mark" aria-hidden="true" /><p>Opening your Prism workspace...</p></main>;
+  }
+
+  const isSignInRoute = route.startsWith("#/sign-in");
+  const isLandingRoute = !isSignedIn ? !isSignInRoute : route === "#/welcome";
+
+  if (isLandingRoute) {
+    return <LandingPage isSignedIn={Boolean(isSignedIn)} onEnter={() => { location.hash = isSignedIn ? "#/" : "#/sign-in"; }} />;
   }
 
   if (!isSignedIn) {
