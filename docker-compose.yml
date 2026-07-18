@@ -18,6 +18,11 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    # Supplies local-only Clerk/OpenAI settings from the ignored .env file. The
+    # explicit values below intentionally keep the Docker database and frontend
+    # origin consistent for the local stack.
+    env_file:
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/personalized_learning
       FRONTEND_URL: http://localhost:5173

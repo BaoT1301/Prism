@@ -3,7 +3,9 @@ import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
-  server: { port: 5173 },
+  // Clerk's authorized-party check uses the full browser origin. Failing rather
+  // than silently moving to 5174 keeps the documented local setup trustworthy.
+  server: { port: 5173, strictPort: true },
   build: {
     rollupOptions: {
       input: {
