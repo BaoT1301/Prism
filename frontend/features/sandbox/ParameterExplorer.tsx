@@ -37,6 +37,7 @@ export function ParameterExplorer({
   const [saveStatus, setSaveStatus] = useState<Parameters<typeof SaveStatus>[0]["status"]>("idle");
   const [hint, setHint] = useState<HintResponse>();
   const [hintError, setHintError] = useState<string>();
+  const [isRequestingHint, setIsRequestingHint] = useState(false);
   const [reflectionAnswers, setReflectionAnswers] = useState<ReflectionAnswer[]>(initialSession.reflection_answers);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
@@ -88,6 +89,8 @@ export function ParameterExplorer({
   }, [api, completedStepIds, reflectionAnswers, values]);
 
   async function requestHint() {
+    if (isRequestingHint) return;
+    setIsRequestingHint(true);
     setHintError(undefined);
     try {
       const nextHint = await api.requestHint(session.id, "", spec.guided_steps.find((step) => !completedStepIds.includes(step.id))?.id);
@@ -95,6 +98,8 @@ export function ParameterExplorer({
       setSession((current) => ({ ...current, hints_used: nextHint.hint_level }));
     } catch (error) {
       setHintError(error instanceof Error ? error.message : "Unable to request a hint.");
+    } finally {
+      setIsRequestingHint(false);
     }
   }
 
@@ -160,7 +165,7 @@ export function ParameterExplorer({
             <div className="simulation-action"><div><p className="card-kicker">Ready when you are</p><strong>Change a variable, then run the experiment.</strong></div><button className="primary-button" type="button" onClick={() => setRunToken((token) => token + 1)}>Run experiment <span aria-hidden="true">→</span></button></div>
           </div>
           <aside className="coach-column">
-            <HintPanel hint={hint} remaining={hint?.remaining_hint_levels ?? Math.max(0, 3 - session.hints_used)} onRequest={requestHint} />
+            <HintPanel hint={hint} remaining={hint?.remaining_hint_levels ?? Math.max(0, 3 - session.hints_used)} isRequesting={isRequestingHint} onRequest={requestHint} />
             {hintError && <p className="inline-error" role="alert">{hintError}</p>}
             <div className="objective-card"><p className="card-kicker">Learning objective</p><p>{spec.introduction}</p><span className="objective-tag">F = ma</span></div>
           </aside>
@@ -170,6 +175,15 @@ export function ParameterExplorer({
           <div className="section-heading"><div><p className="card-kicker">Physics controls</p><h2>Shape the experiment.</h2></div><div className="formula-display"><span>Force = Mass × Acceleration</span><strong>{result.toFixed(2)} N</strong></div></div>
           <div className="variable-grid">{spec.variables.map((variable) => <VariableSlider key={variable.id} variable={variable} value={values[variable.id]} onChange={(value) => setValues((current) => ({ ...current, [variable.id]: value }))} />)}</div>
           <div className="physics-hud"><div><span>Mass</span><strong>{values.mass} <small>kg</small></strong></div><div><span>Acceleration</span><strong>{values.acceleration} <small>m/s²</small></strong></div><div className="hud-force"><span>Force</span><strong>{result.toFixed(2)} <small>N</small></strong></div></div>
+        </section>
+
+        <section className="guided-progress" aria-labelledby="guided-progress-title">
+          <div className="section-heading"><div><p className="card-kicker">Discovery progress</p><h2 id="guided-progress-title">Build your evidence.</h2></div><strong>{completedStepIds.length} / {spec.guided_steps.length}</strong></div>
+          <div className="progress-track" role="progressbar" aria-label="Guided steps complete" aria-valuemin={0} aria-valuemax={spec.guided_steps.length} aria-valuenow={completedStepIds.length}><span style={{ width: `${percentage}%` }} /></div>
+          <ol className="guided-step-list">{spec.guided_steps.map((step, index) => {
+            const complete = completedStepIds.includes(step.id);
+            return <li className={complete ? "is-complete" : ""} key={step.id}><span aria-hidden="true">{complete ? "✓" : String(index + 1).padStart(2, "0")}</span><p>{step.instruction}</p></li>;
+          })}</ol>
         </section>
 
         {spec.mission && missionEvaluation && <section className="mission-card">

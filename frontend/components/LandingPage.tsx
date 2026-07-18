@@ -1,4 +1,4 @@
-import { type PointerEvent, useRef } from "react";
+import { type PointerEvent, useRef, useState } from "react";
 
 import { PrismBrand } from "./AppChrome";
 
@@ -34,9 +34,16 @@ const paths = [
   },
 ];
 
+const previewHints = [
+  "Keep mass steady, then raise acceleration. Watch the force value respond.",
+  "Compare two runs that change only one variable. That makes the pattern easier to see.",
+  "Use F = ma to explain the relationship in your own words after you compare the runs.",
+];
+
 export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
   const enterLabel = isSignedIn ? "Open workspace" : "Enter Prism";
   const heroArtRef = useRef<HTMLDivElement>(null);
+  const [previewHintIndex, setPreviewHintIndex] = useState(-1);
 
   function moveHero(event: PointerEvent<HTMLDivElement>) {
     const element = heroArtRef.current;
@@ -181,7 +188,7 @@ export function LandingPage({ isSignedIn, onEnter }: LandingPageProps) {
               </div>
               <div className="sim-readout"><span>Mass<strong>0.62 kg</strong></span><span>Acceleration<strong>8.0 m/s²</strong></span><span>Force<strong>4.96 N</strong></span></div>
             </div>
-            <aside className="product-coach"><span>✦</span><p>Prism guide</p><h4>What do you notice as acceleration increases?</h4><button type="button" tabIndex={-1}>Ask for a hint</button></aside>
+            <aside className="product-coach"><span>✦</span><p>Prism guide</p><h4>{previewHintIndex >= 0 ? previewHints[previewHintIndex] : "What do you notice as acceleration increases?"}</h4><button type="button" onClick={() => setPreviewHintIndex((current) => (current + 1) % previewHints.length)}>{previewHintIndex >= 0 ? `Next hint · ${previewHintIndex + 1} of ${previewHints.length}` : "Ask for a hint"}</button><button className="product-coach-link" type="button" onClick={onEnter}>Try it in Prism <span aria-hidden="true">→</span></button></aside>
           </div>
         </div>
       </section>
