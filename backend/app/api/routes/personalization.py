@@ -46,6 +46,7 @@ def start_assignment(assignment_id: uuid.UUID, db: Annotated[Session, Depends(ge
         "responses": session.responses,
         "reflection_answers": session.progress.get("reflection_answers", []),
         "hints_used": session.hints_used,
+        "submitted_at": session.submitted_at,
         "updated_at": session.updated_at,
     })
     return {"generated_assignment": {"id": generated.id, "assignment_id": generated.assignment_id, "student_id": generated.student_id, "personalized_title": generated.personalized_title, "scenario": generated.scenario, "problem_statement": generated.problem_statement, "learning_objective": generated.learning_objective, "instructions": generated.instructions, "reflection_questions": generated.reflection_questions, "sandbox_spec": generated.sandbox_spec, "generated_at": generated.completed_at or generated.created_at}, "cache_status": cache_status, "session": session_payload}

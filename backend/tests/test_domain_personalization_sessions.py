@@ -1,5 +1,6 @@
 import pytest
 
+from app.api.routes.personalization import start_assignment
 from app.api.routes.sessions import assignment_progress, hint, owned_session, submit, update_progress
 from app.core.errors import ApiError
 from app.models.models import AssignmentStatus, Profile, UserRole
@@ -105,6 +106,21 @@ def test_generation_falls_back_to_validated_fixture(domain_db):
     assert generated.learning_objective == assignment.learning_objective
     assert generated.sandbox_spec["sandbox_type"] == "parameter_explorer"
     assert session.student_id == student.id
+
+
+def test_start_assignment_includes_all_session_response_fields(domain_db):
+    db, teacher, student, _, _ = domain_db
+    domain = DomainService()
+    classroom = domain.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
+    domain.join_class(db, student, classroom.join_code)
+    assignment = domain.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Force", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type="parameter_explorer"))
+    domain.publish_assignment(db, assignment.id, teacher)
+    domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
+
+    response = start_assignment(assignment.id, db, student, PersonalizationService(FixturePersonalizationProvider()))
+
+    assert response["session"].submitted_at is None
+    assert response["session"].status.value == "in_progress"
 
 
 def test_objective_and_schema_invariants_are_enforced(domain_db):
