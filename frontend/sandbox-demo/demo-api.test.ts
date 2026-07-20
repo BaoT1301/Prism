@@ -49,6 +49,29 @@ describe("local sandbox demo API", () => {
     expect(reloaded.reflection_answers).toEqual([{ question_id: "reflection-1", answer: "Force increases." }]);
   });
 
+  it("bases coach hints on the student's recorded slider movement", async () => {
+    const api = createDemoSandboxApi(validateSandboxSpec(basketball), memoryStorage());
+    const launch = await api.launchAssignment("demo-assignment");
+    const saved = await api.updateProgress(launch.session.id, {
+      expected_version: launch.session.version,
+      completed_step_ids: [],
+      responses: { mass: 0.7, acceleration: 8 },
+      reflection_answers: [],
+      interaction_events: [{
+        event_type: "slider_changed",
+        recorded_at: "2026-07-18T12:00:00Z",
+        variable_id: "mass",
+        previous_value: 0.6,
+        value: 0.7,
+      }],
+    });
+
+    expect(saved.interaction_events).toMatchObject([{ variable_id: "mass", direction: "increased" }]);
+    await expect(api.requestHint(saved.id, "", "step-1")).resolves.toMatchObject({
+      hint: expect.stringContaining("moved basketball mass up"),
+    });
+  });
+
   it("replaces stale demo state that no longer fits the active fixture", async () => {
     const storage = memoryStorage();
     storage.setItem("prism-sandbox-demo:v3:Basketball Force Lab", JSON.stringify({

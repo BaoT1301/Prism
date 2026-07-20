@@ -23,6 +23,24 @@ interface StoredDemoState {
   submission?: SubmissionResponse;
 }
 
+function demoHint(spec: SandboxSpec, session: SandboxSession, currentStepId?: string): string {
+  const sliderEvents = (session.interaction_events ?? []).filter((event) => event.event_type === "slider_changed");
+  const latest = sliderEvents.at(-1);
+  if (latest?.variable_id && typeof latest.value === "number" && typeof latest.previous_value === "number") {
+    const label = spec.variables.find((variable) => variable.id === latest.variable_id)?.label ?? latest.variable_id;
+    const direction = latest.value > latest.previous_value ? "up" : latest.value < latest.previous_value ? "down" : "without changing it";
+    if (session.hints_used === 1) return `You moved ${label.toLowerCase()} ${direction}. Keep the other setting steady and notice how the calculated force responds.`;
+    if (session.hints_used === 2) return `Use your ${label.toLowerCase()} change as a comparison: what would you expect if only the other setting changed?`;
+  }
+
+  const currentStep = spec.guided_steps.find((item) => item.id === currentStepId);
+  const variableId = currentStep?.completion_checks?.find((check) => check.variable_id)?.variable_id;
+  const variable = spec.variables.find((item) => item.id === variableId)?.label ?? "one setting";
+  if (session.hints_used === 1) return `Focus on ${variable.toLowerCase()} while working on the next step. What happens when you change it?`;
+  if (session.hints_used === 2) return `Keep the other variable steady and compare the calculated force before and after changing ${variable.toLowerCase()}.`;
+  return "Use the force equation to explain the pattern you observed.";
+}
+
 function createSession(spec: SandboxSpec): SandboxSession {
   return {
     id: crypto.randomUUID(),
@@ -112,6 +130,10 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
       }
       const missionEvaluation = spec.mission ? evaluateMission(spec, request.responses) : undefined;
       const events = [...(state.session.interaction_events ?? [])];
+      for (const interaction of request.interaction_events ?? []) {
+        const direction = interaction.value > interaction.previous_value ? "increased" : interaction.value < interaction.previous_value ? "decreased" : "unchanged";
+        events.push({ ...interaction, direction });
+      }
       if (request.experiment_event) {
         events.push({ ...request.experiment_event, outputs: missionEvaluation?.outputs, mission_complete: Boolean(missionEvaluation?.complete) });
       }
@@ -133,18 +155,9 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
       }
       state.session = { ...state.session, hints_used: state.session.hints_used + 1, updated_at: new Date().toISOString() };
       writeState(state);
-      const step = currentStepId ? `step ${currentStepId}` : "the next guided step";
-      const currentStep = spec.guided_steps.find((item) => item.id === currentStepId);
-      const variableId = currentStep?.completion_checks?.find((check) => check.variable_id)?.variable_id;
-      const variable = spec.variables.find((item) => item.id === variableId)?.label ?? "the changing variable";
-      const hints = [
-        `Focus on ${variable.toLowerCase()} while working on ${step}. What happens when you change it?`,
-        `Keep the other variable steady and compare the calculated force before and after changing ${variable.toLowerCase()}.`,
-        "Use force = mass × acceleration to explain why the force changed.",
-      ];
       return {
         hint_level: state.session.hints_used,
-        hint: hints[state.session.hints_used - 1],
+        hint: demoHint(spec, state.session, currentStepId),
         remaining_hint_levels: 3 - state.session.hints_used,
       };
     },
