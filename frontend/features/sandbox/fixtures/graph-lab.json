@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "sandbox_type": "graph_lab",
+  "visual_theme": "formula1",
+  "personal_scene": { "setting": "racetrack", "primary_prop": "race_car", "accent_props": ["camera", "headphones"], "mood": "neon", "label": "Your race-night pit lane" },
+  "title": "Racing Force Graph Lab",
+  "introduction": "Record controlled force trials and compare how a racing car's mass and acceleration change the result.",
+  "formula_id": "force_equals_mass_times_acceleration",
+  "variables": [
+    { "id": "mass", "label": "Car mass", "unit": "kg", "min": 700, "max": 900, "step": 10, "default": 800, "editable": true },
+    { "id": "acceleration", "label": "Acceleration", "unit": "m/s^2", "min": 1, "max": 20, "step": 1, "default": 8, "editable": true }
+  ],
+  "guided_steps": [
+    { "id": "step-1", "instruction": "Change the car's mass, then record a trial.", "completion_checks": [{ "type": "value_changed", "variable_id": "mass" }] },
+    { "id": "step-2", "instruction": "Change acceleration and compare the next force value.", "completion_checks": [{ "type": "value_changed", "variable_id": "acceleration" }] },
+    { "id": "step-3", "instruction": "Explain the pattern you see in your trials.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
+  ],
+  "completion_rules": [{ "type": "all_steps_completed" }],
+  "reflection_questions": [{ "id": "reflection-1", "question": "What happens to force when you change one variable while holding the other steady?" }]
+}

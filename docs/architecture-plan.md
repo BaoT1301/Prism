@@ -336,6 +336,8 @@ sandbox_type -> frontend renderer
 formula_id   -> deterministic calculation implementation
 ```
 
+The current registered renderers are `parameter_explorer`, `graph_lab`, and `guided_activity`. They share the safe formula registry, session contract, hints, reflection, submission, and optional bounded 3D scene. The format controls how a student organizes evidence, not the learning objective.
+
 The AI may choose supported values and configure:
 
 - Labels

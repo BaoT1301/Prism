@@ -66,14 +66,13 @@ The sandbox is the centerpiece of the MVP. It combines:
 
 The AI does not generate executable code. It returns a validated configuration for a finite set of sandbox templates implemented by the frontend.
 
-Initial supported sandbox template:
+Supported sandbox templates:
 
-- `parameter_explorer`
+- `parameter_explorer`: manipulate visible variables and observe the deterministic result.
+- `graph_lab`: record and compare controlled trials in a lightweight force chart.
+- `guided_activity`: follow a sequenced investigation with a next-step prompt.
 
-Stretch templates, only after the complete vertical slice works:
-
-- `graph_lab`
-- `guided_activity`
+All three formats use the same validated formula registry and progress, hint, reflection, and submission flow. New types remain opt-in until a renderer, contract validation, and tests ship together.
 
 ## Golden demo
 
@@ -99,7 +98,7 @@ Required:
 - Assignment creation and publishing
 - Student interest profile
 - Personalized assignment generation
-- One reliable interactive sandbox template
+- Three reliable, schema-driven sandbox formats
 - Progressive hints
 - Progress persistence
 - Submission

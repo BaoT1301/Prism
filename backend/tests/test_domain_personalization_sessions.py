@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+from pydantic import ValidationError
 
 from app.api.routes.personalization import start_assignment
 from app.api.routes.sessions import assignment_progress, hint, owned_session, submit, update_progress
@@ -69,8 +70,10 @@ def test_invalid_join_and_sandbox_are_rejected(domain_db):
     with pytest.raises(ApiError):
         service.join_class(db, student, "missing")
     classroom = service.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
-    with pytest.raises(ApiError):
-        service.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Bad", topic="Bad", learning_objective="Learn.", grade_level="10", sandbox_type="graph_lab"))
+    graph_lab = service.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Graph", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type="graph_lab"))
+    assert graph_lab.sandbox_type == "graph_lab"
+    with pytest.raises(ValidationError):
+        AssignmentCreate(title="Bad", topic="Bad", learning_objective="Learn.", grade_level="10", sandbox_type="unknown")
 
 
 def test_fixture_generation_is_valid_cached_and_session_safe(domain_db):
@@ -95,6 +98,21 @@ def test_fixture_generation_is_valid_cached_and_session_safe(domain_db):
     provider.validate(assignment, cached_content)
     with pytest.raises(ApiError):
         owned_session(db, session.id, other_student)
+
+
+@pytest.mark.parametrize("sandbox_type", ["graph_lab", "guided_activity"])
+def test_fixture_preserves_the_selected_sandbox_format(domain_db, sandbox_type):
+    db, teacher, student, _, _ = domain_db
+    domain = DomainService()
+    classroom = domain.create_class(db, teacher, ClassCreate(name="Physics", subject="Physics", grade_level="10"))
+    domain.join_class(db, student, classroom.join_code)
+    assignment = domain.create_assignment(db, classroom.id, teacher, AssignmentCreate(title="Format", topic="Force", learning_objective="Apply F = ma.", grade_level="10", sandbox_type=sandbox_type))
+    domain.publish_assignment(db, assignment.id, teacher)
+    interests = domain.save_interests(db, student, InterestsRequest(sports=["basketball"]))
+
+    generated, _, _ = PersonalizationService(FixturePersonalizationProvider()).start(db, assignment, student, interests)
+
+    assert generated.sandbox_spec["sandbox_type"] == sandbox_type
 
 
 def test_generation_falls_back_to_validated_fixture(domain_db):

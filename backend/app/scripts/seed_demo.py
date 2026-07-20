@@ -34,8 +34,14 @@ def main() -> None:
                 db.add(ClassMember(class_id=classroom.id, student_id=student.id))
             if not db.scalar(select(InterestProfile).where(InterestProfile.student_id == student.id)):
                 db.add(InterestProfile(student_id=student.id, sports=[interest]))
-        if not db.scalar(select(Assignment).where(Assignment.class_id == classroom.id, Assignment.title == "Newton's Second Law Lab")):
-            db.add(Assignment(class_id=classroom.id, teacher_id=teacher.id, title="Newton's Second Law Lab", topic="Newton's Second Law", learning_objective="Apply F = ma to calculate force, mass, or acceleration.", grade_level="10", instructions="Explore how mass and acceleration affect force.", sandbox_type="parameter_explorer", status=AssignmentStatus.PUBLISHED))
+        assignments = [
+            ("Newton's Second Law Lab", "Newton's Second Law", "Explore how mass and acceleration affect force.", "parameter_explorer"),
+            ("Racing Force Graph Lab", "Newton's Second Law", "Record controlled Formula 1 force trials and compare the graph.", "graph_lab"),
+            ("Rocket Payload Investigation", "Newton's Second Law", "Follow the launch mission, test variables, and explain your evidence.", "guided_activity"),
+        ]
+        for title, topic, instructions, sandbox_type in assignments:
+            if not db.scalar(select(Assignment).where(Assignment.class_id == classroom.id, Assignment.title == title)):
+                db.add(Assignment(class_id=classroom.id, teacher_id=teacher.id, title=title, topic=topic, learning_objective="Apply F = ma to calculate force, mass, or acceleration.", grade_level="10", instructions=instructions, sandbox_type=sandbox_type, status=AssignmentStatus.PUBLISHED))
         db.commit()
     print("Demo seed completed.")
 

@@ -74,7 +74,7 @@ function AssignmentForm({ initial, onSubmit, saving }: { initial?: Assignment; o
         learning_objective: String(form.get("learning_objective")),
         grade_level: String(form.get("grade_level")),
         instructions: String(form.get("instructions")),
-        sandbox_type: "parameter_explorer",
+        sandbox_type: String(form.get("sandbox_type")) as AssignmentInput["sandbox_type"],
       });
     }}>
       <div className="form-section-heading"><span>01</span><div><h2>Assignment essentials</h2><p>Start with the academic goal. Prism will personalize the context, never the objective.</p></div></div>
@@ -82,7 +82,13 @@ function AssignmentForm({ initial, onSubmit, saving }: { initial?: Assignment; o
         <Field label="Assignment title"><input name="title" placeholder="Newton's Second Law Lab" required defaultValue={initial?.title} /></Field>
         <Field label="Lesson topic"><input name="topic" placeholder="Newton's Second Law" required defaultValue={initial?.topic} /></Field>
         <Field label="Grade level"><input name="grade_level" placeholder="10" required defaultValue={initial?.grade_level} /></Field>
-        <Field label="Experience type" hint="The supported interactive MVP renderer."><input value="Parameter explorer" disabled /></Field>
+        <Field label="Experience type" hint="Each format keeps the same F = ma objective but gives students a different way to investigate it.">
+          <select name="sandbox_type" defaultValue={initial?.sandbox_type ?? "parameter_explorer"}>
+            <option value="parameter_explorer">Parameter Explorer · manipulate variables</option>
+            <option value="graph_lab">Graph Lab · record and compare trials</option>
+            <option value="guided_activity">Guided Investigation · work through a mission</option>
+          </select>
+        </Field>
       </div>
       <Field label="Learning objective" hint="This exact objective is preserved for every student."><textarea name="learning_objective" rows={4} placeholder="Apply F = ma to calculate force, mass, or acceleration." required defaultValue={initial?.learning_objective} /></Field>
       <Field label="Teacher instructions"><textarea name="instructions" rows={5} placeholder="Invite students to change mass and acceleration, observe the force, and explain the pattern." defaultValue={initial?.instructions ?? ""} /></Field>
@@ -289,7 +295,7 @@ function AssignmentPage({ api, assignmentId }: { api: TeacherApi; assignmentId: 
       {editing ? <AssignmentForm initial={assignment} saving={saving} onSubmit={save} /> : (
         <section className="assignment-brief">
           <div className="brief-lead"><p className="eyebrow">Protected learning objective</p><blockquote>{assignment.learning_objective}</blockquote></div>
-          <dl className="details"><div><dt>Grade</dt><dd>{assignment.grade_level}</dd></div><div><dt>Experience</dt><dd>Parameter explorer</dd></div><div><dt>Version</dt><dd>{assignment.content_version}</dd></div><div><dt>Status</dt><dd>{assignment.status}{assignment.published_at ? ` · ${date(assignment.published_at)}` : ""}</dd></div><div className="detail-wide"><dt>Teacher instructions</dt><dd>{assignment.instructions || "No additional instructions."}</dd></div></dl>
+          <dl className="details"><div><dt>Grade</dt><dd>{assignment.grade_level}</dd></div><div><dt>Experience</dt><dd>{{ parameter_explorer: "Parameter Explorer", graph_lab: "Graph Lab", guided_activity: "Guided Investigation" }[assignment.sandbox_type]}</dd></div><div><dt>Version</dt><dd>{assignment.content_version}</dd></div><div><dt>Status</dt><dd>{assignment.status}{assignment.published_at ? ` · ${date(assignment.published_at)}` : ""}</dd></div><div className="detail-wide"><dt>Teacher instructions</dt><dd>{assignment.instructions || "No additional instructions."}</dd></div></dl>
         </section>
       )}
       <section className="content-section submission-section">

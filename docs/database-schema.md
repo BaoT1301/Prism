@@ -152,7 +152,7 @@ updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 Constraints:
 
 - `content_version >= 1`
-- `sandbox_type` must match an approved renderer
+- `sandbox_type` must be one of `parameter_explorer`, `graph_lab`, or `guided_activity`
 - Published status should have `published_at`
 
 Indexes:

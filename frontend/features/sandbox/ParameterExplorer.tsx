@@ -10,9 +10,11 @@ import { VariableSlider } from "../../components/sandbox/VariableSlider";
 import { SandboxApiError, type SandboxApi } from "../../lib/sandbox/sandbox-api";
 import { completionRulesSatisfied, mergeCompletedStepIds } from "./completion";
 import { calculateFormula } from "./formula-registry";
+import { GraphLabPanel } from "./GraphLabPanel";
+import { GuidedActivityPanel } from "./GuidedActivityPanel";
 import { evaluateMission } from "./mission";
 import { buildProgressRequest, progressPercentage } from "./progress";
-import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec } from "./sandbox-types";
+import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec, SandboxType } from "./sandbox-types";
 
 const ThreePhysicsScene = lazy(async () => {
   const module = await import("../../components/sandbox/ThreePhysicsScene");
@@ -24,12 +26,20 @@ export function ParameterExplorer({
   initialSession,
   api,
   onExit,
+  format = "parameter_explorer",
 }: {
   spec: SandboxSpec;
   initialSession: SandboxSession;
   api: SandboxApi;
   onExit?: () => void;
+  format?: SandboxType;
 }) {
+  const formatCopy: Record<SandboxType, { eyebrow: string; heading: string; controls: string }> = {
+    parameter_explorer: { eyebrow: "Experiment 01 · Parameter explorer", heading: "Shape the experiment.", controls: "Physics controls" },
+    graph_lab: { eyebrow: "Experiment 02 · Graph lab", heading: "Build a force story.", controls: "Trial controls" },
+    guided_activity: { eyebrow: "Experiment 03 · Guided investigation", heading: "Test the next idea.", controls: "Investigation controls" },
+  };
+  const formatDetails = formatCopy[format];
   const initialValues = Object.fromEntries(spec.variables.map((variable) => [variable.id, initialSession.responses[variable.id] ?? variable.default]));
   const [values, setValues] = useState<Record<string, number>>(initialValues);
   const [completedStepIds, setCompletedStepIds] = useState(initialSession.completed_step_ids);
@@ -156,7 +166,7 @@ export function ParameterExplorer({
       </header>
       <main className="sandbox-main">
         <section className="mission-hero">
-          <div><p className="eyebrow">Experiment 01 · Parameter explorer</p><h1>{spec.title}</h1><p className="mission-intro">{spec.introduction}</p></div>
+          <div><p className="eyebrow">{formatDetails.eyebrow}</p><h1>{spec.title}</h1><p className="mission-intro">{spec.introduction}</p></div>
           <div className="mission-status"><span className="status-dot" />{missionComplete ? (spec.mission ? "Mission complete" : "Experiment complete") : (spec.mission && missionEvaluation?.complete ? "Ready to record" : spec.mission ? "Mission in progress" : `${percentage}% explored`)}</div>
         </section>
 
@@ -175,10 +185,16 @@ export function ParameterExplorer({
         </div>
 
         <section className="controls-card">
-          <div className="section-heading"><div><p className="card-kicker">Physics controls</p><h2>Shape the experiment.</h2></div><div className="formula-display"><span>Force = Mass × Acceleration</span><strong>{result.toFixed(2)} N</strong></div></div>
+          <div className="section-heading"><div><p className="card-kicker">{formatDetails.controls}</p><h2>{formatDetails.heading}</h2></div><div className="formula-display"><span>Force = Mass × Acceleration</span><strong>{result.toFixed(2)} N</strong></div></div>
           <div className="variable-grid">{spec.variables.map((variable) => <VariableSlider key={variable.id} variable={variable} value={values[variable.id]} onChange={(value) => setValues((current) => ({ ...current, [variable.id]: value }))} />)}</div>
           <div className="physics-hud"><div><span>Mass</span><strong>{values.mass} <small>kg</small></strong></div><div><span>Acceleration</span><strong>{values.acceleration} <small>m/s²</small></strong></div><div className="hud-force"><span>Force</span><strong>{result.toFixed(2)} <small>N</small></strong></div></div>
         </section>
+
+        {format === "graph_lab" && <GraphLabPanel values={values} force={result} />}
+        {format === "guided_activity" && <GuidedActivityPanel steps={spec.guided_steps} completedStepIds={completedStepIds} onRun={() => {
+          if (spec.mission) void runExperiment();
+          else setRunToken((token) => token + 1);
+        }} />}
 
         <section className="guided-progress" aria-labelledby="guided-progress-title">
           <div className="section-heading"><div><p className="card-kicker">Discovery progress</p><h2 id="guided-progress-title">Build your evidence.</h2></div><strong>{completedStepIds.length} / {spec.guided_steps.length}</strong></div>

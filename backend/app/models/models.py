@@ -111,7 +111,7 @@ class Assignment(TimestampMixin, Base):
     content_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     class_: Mapped[Class] = relationship(back_populates="assignments")
-    __table_args__ = (CheckConstraint("content_version >= 1", name="ck_assignments_content_version"), CheckConstraint("sandbox_type = 'parameter_explorer'", name="ck_assignments_sandbox_type"), Index("ix_assignments_class_status", "class_id", "status"), Index("ix_assignments_class_created", "class_id", "created_at"))
+    __table_args__ = (CheckConstraint("content_version >= 1", name="ck_assignments_content_version"), CheckConstraint("sandbox_type IN ('parameter_explorer', 'graph_lab', 'guided_activity')", name="ck_assignments_sandbox_type"), Index("ix_assignments_class_status", "class_id", "status"), Index("ix_assignments_class_created", "class_id", "created_at"))
 
 
 class InterestProfile(TimestampMixin, Base):

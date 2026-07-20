@@ -1,4 +1,4 @@
-export type SandboxType = "parameter_explorer";
+export type SandboxType = "parameter_explorer" | "graph_lab" | "guided_activity";
 export type FormulaId = "force_equals_mass_times_acceleration";
 export type VisualTheme = "basketball" | "formula1" | "space";
 export type PersonalSceneSetting = "court" | "racetrack" | "launchpad" | "music_room" | "gaming_desk" | "art_studio" | "city_park" | "workshop" | "science_lab" | "kitchen" | "concert_stage" | "ocean" | "mountain_trail" | "animal_sanctuary" | "sports_gym" | "library";

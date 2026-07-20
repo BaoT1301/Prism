@@ -20,7 +20,9 @@
     },
     "sandbox_type": {
       "enum": [
-        "parameter_explorer"
+        "parameter_explorer",
+        "graph_lab",
+        "guided_activity"
       ]
     },
     "visual_theme": {

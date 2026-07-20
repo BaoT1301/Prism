@@ -1,3 +1,5 @@
+import { GraphLab } from "./GraphLab";
+import { GuidedActivity } from "./GuidedActivity";
 import { ParameterExplorer } from "./ParameterExplorer";
 import { validateSandboxSpec } from "./sandbox-validation";
 import type { SandboxApi } from "../../lib/sandbox/sandbox-api";
@@ -7,6 +9,8 @@ export function SandboxRenderer({ spec, session, api, onExit }: { spec: SandboxS
   try {
     const validated = validateSandboxSpec(spec);
     if (validated.sandbox_type === "parameter_explorer") return <ParameterExplorer spec={validated} initialSession={session} api={api} onExit={onExit} />;
+    if (validated.sandbox_type === "graph_lab") return <GraphLab spec={validated} initialSession={session} api={api} onExit={onExit} />;
+    if (validated.sandbox_type === "guided_activity") return <GuidedActivity spec={validated} initialSession={session} api={api} onExit={onExit} />;
   } catch (error) {
     return <p role="alert">{error instanceof Error ? error.message : "The sandbox configuration is invalid."}</p>;
   }

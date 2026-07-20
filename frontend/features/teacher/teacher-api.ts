@@ -2,7 +2,7 @@ import { apiRequest, type AccessTokenProvider } from "../../lib/api-client";
 
 export type Profile = { id: string; email: string; display_name: string; role: "teacher" | "student"; created_at: string };
 export type ClassSummary = { id: string; name: string; subject: string; grade_level: string; description?: string | null; join_code: string; student_count: number; assignment_count: number; created_at: string };
-export type Assignment = { id: string; class_id: string; title: string; topic: string; learning_objective: string; grade_level: string; instructions?: string | null; sandbox_type: "parameter_explorer"; status: "draft" | "published" | "archived"; content_version: number; published_at?: string | null; created_at: string };
+export type Assignment = { id: string; class_id: string; title: string; topic: string; learning_objective: string; grade_level: string; instructions?: string | null; sandbox_type: "parameter_explorer" | "graph_lab" | "guided_activity"; status: "draft" | "published" | "archived"; content_version: number; published_at?: string | null; created_at: string };
 export type Member = { student_id: string; display_name: string; joined_at: string };
 export type Submission = { submission_id: string; student_id: string; student_name: string; status: string; submitted_at?: string | null };
 export type AssignmentProgress = { student_id: string; student_name: string; status: "not_started" | "in_progress" | "submitted"; completed_steps: number; total_steps: number; hints_used: number; submitted_at?: string | null; feedback?: { teacher_summary?: { attempts?: number; hints_used?: number; random_experimentation?: boolean; mastery?: string } } | null };

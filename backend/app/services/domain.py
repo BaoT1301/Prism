@@ -10,7 +10,7 @@ from app.core.errors import ApiError
 from app.models.models import Assignment, AssignmentStatus, Class, ClassMember, InterestProfile, Profile
 from app.schemas.domain import AssignmentCreate, AssignmentUpdate, ClassCreate, InterestsRequest
 
-SUPPORTED_SANDBOXES = {"parameter_explorer"}
+SUPPORTED_SANDBOXES = {"parameter_explorer", "graph_lab", "guided_activity"}
 
 
 class DomainService:

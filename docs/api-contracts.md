@@ -81,7 +81,7 @@ SandboxSessionStatus:
 - submitted
 ```
 
-The MVP is required to implement only `parameter_explorer`. Other values may remain disabled until renderers exist.
+The MVP implements `parameter_explorer`, `graph_lab`, and `guided_activity`. Other values remain disabled until a corresponding renderer, validated schema update, and tests exist.
 
 ## 4. Authentication and profile
 
@@ -320,6 +320,8 @@ Request:
 ```
 
 Response `201`: assignment resource with `status: "draft"` and `content_version: 1`.
+
+`sandbox_type` is one of `parameter_explorer`, `graph_lab`, or `guided_activity`. Each currently uses the approved `force_equals_mass_times_acceleration` formula. The selected type is preserved by personalization and selects a frontend renderer; clients must not infer a renderer from free-form model output.
 
 ### GET `/classes/{class_id}/assignments`
 

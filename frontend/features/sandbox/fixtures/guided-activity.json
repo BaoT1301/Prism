@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "sandbox_type": "guided_activity",
+  "visual_theme": "space",
+  "personal_scene": { "setting": "launchpad", "primary_prop": "rocket", "accent_props": ["planet", "drone"], "mood": "starlight", "label": "Your launch control room" },
+  "title": "Rocket Payload Investigation",
+  "introduction": "Work through a launch-planning mission by testing how payload mass and acceleration shape force.",
+  "formula_id": "force_equals_mass_times_acceleration",
+  "variables": [
+    { "id": "mass", "label": "Payload mass", "unit": "kg", "min": 100, "max": 900, "step": 50, "default": 400, "editable": true },
+    { "id": "acceleration", "label": "Launch acceleration", "unit": "m/s^2", "min": 1, "max": 20, "step": 1, "default": 8, "editable": true }
+  ],
+  "guided_steps": [
+    { "id": "step-1", "instruction": "Adjust the payload mass to test a new launch setup.", "completion_checks": [{ "type": "value_changed", "variable_id": "mass" }] },
+    { "id": "step-2", "instruction": "Increase launch acceleration and run the investigation.", "completion_checks": [{ "type": "value_increased", "variable_id": "acceleration" }] },
+    { "id": "step-3", "instruction": "Use the evidence to explain the force change.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
+  ],
+  "completion_rules": [{ "type": "all_steps_completed" }],
+  "reflection_questions": [{ "id": "reflection-1", "question": "How would you adjust the rocket plan if you needed more force?" }]
+}

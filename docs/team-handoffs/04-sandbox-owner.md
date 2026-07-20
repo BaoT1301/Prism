@@ -1,11 +1,17 @@
-# Person 4 - Parameter Explorer Sandbox
+# Person 4 - Sandbox Renderer
 
 Read docs/team-handoffs/README.md, contracts/sandbox-spec.schema.json, and fixtures
 under contracts/examples/. Do not change the schema without Persons 1 and 5.
 
-## Own
+## Current renderer registry
 
-Build the renderer for sandbox_type parameter_explorer.
+The demo supports three approved formats:
+
+- `parameter_explorer`: variable manipulation and deterministic calculation.
+- `graph_lab`: the same safe controls plus recorded trial comparison.
+- `guided_activity`: the same safe controls plus a next-step investigation panel.
+
+All formats use the same schema, formula registry, mission guardrails, session API, hints, reflection, and submission flow. Do not add a type without coordinated schema, backend, frontend, migration, fixture, and test changes.
 
 ## Requirements
 

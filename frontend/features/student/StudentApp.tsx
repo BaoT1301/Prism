@@ -7,7 +7,7 @@ import { SandboxRenderer } from "../sandbox/SandboxRenderer";
 import type { SandboxLaunch } from "../sandbox/sandbox-types";
 
 type ClassItem = { id: string; name: string; subject: string; grade_level: string };
-type Assignment = { id: string; title: string; topic: string; status: string };
+type Assignment = { id: string; title: string; topic: string; status: string; sandbox_type: "parameter_explorer" | "graph_lab" | "guided_activity" };
 type InterestKey = "sports" | "games" | "movies" | "hobbies" | "career_interests" | "favorite_animals" | "favorite_subjects" | "additional_interests";
 type Interests = Record<InterestKey, string[]>;
 type InterestDrafts = Record<InterestKey, string>;
@@ -34,6 +34,11 @@ const interestFields: { key: InterestKey; label: string; placeholder: string }[]
 
 const splitList = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 const normalizeInterests = (value: Interests) => Object.fromEntries(interestFields.map(({ key }) => [key, value[key] ?? []])) as Interests;
+const experienceLabel: Record<Assignment["sandbox_type"], string> = {
+  parameter_explorer: "Parameter Explorer",
+  graph_lab: "Graph Lab",
+  guided_activity: "Guided Investigation",
+};
 
 export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: AccessTokenProvider; onSignOut: () => Promise<unknown> }) {
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -217,7 +222,7 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
               {assignments.map((assignment) => (
                 <article className="assignment-row" key={assignment.id}>
                   <span className="assignment-icon" aria-hidden="true">↗</span>
-                  <div><p>{assignment.topic}</p><h3>{assignment.title}</h3></div>
+                  <div><p>{assignment.topic} <span className="assignment-format">{experienceLabel[assignment.sandbox_type]}</span></p><h3>{assignment.title}</h3></div>
                   <span className="status-pill published">Ready</span>
                   <button type="button" disabled={launchingId === assignment.id} onClick={() => {
                     setError(undefined);

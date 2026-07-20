@@ -16,7 +16,7 @@ function safeText(value: unknown, field: string): string {
 export function validateSandboxSpec(value: unknown): SandboxSpec {
   if (!value || typeof value !== "object") throw new Error("Sandbox specification is invalid.");
   const candidate = value as Partial<SandboxSpec>;
-  if (candidate.version !== 1 || candidate.sandbox_type !== "parameter_explorer") {
+  if (candidate.version !== 1 || !["parameter_explorer", "graph_lab", "guided_activity"].includes(candidate.sandbox_type ?? "")) {
     throw new Error("Unsupported sandbox type or version.");
   }
   safeText(candidate.title, "title");

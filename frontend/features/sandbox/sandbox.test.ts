@@ -1,5 +1,7 @@
 import basketball from "./fixtures/basketball.json";
 import formula1 from "./fixtures/formula1.json";
+import graphLab from "./fixtures/graph-lab.json";
+import guidedActivity from "./fixtures/guided-activity.json";
 import space from "./fixtures/space.json";
 import { describe, expect, it } from "vitest";
 import { automaticallyCompletedStepIds, completionRulesSatisfied, mergeCompletedStepIds } from "./completion";
@@ -8,8 +10,8 @@ import { buildProgressRequest, progressPercentage } from "./progress";
 import { validateSandboxSpec } from "./sandbox-validation";
 
 describe("sandbox contract", () => {
-  it.each([basketball, formula1, space])("accepts the %s fixture", (fixture) => {
-    expect(validateSandboxSpec(fixture).sandbox_type).toBe("parameter_explorer");
+  it.each([basketball, formula1, space, graphLab, guidedActivity])("accepts configured sandbox fixtures", (fixture) => {
+    expect(["parameter_explorer", "graph_lab", "guided_activity"]).toContain(validateSandboxSpec(fixture).sandbox_type);
   });
 
   it("accepts a cached pre-mission sandbox specification", () => {

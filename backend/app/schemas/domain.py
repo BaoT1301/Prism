@@ -1,10 +1,13 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.models import AssignmentStatus
+
+SandboxType = Literal["parameter_explorer", "graph_lab", "guided_activity"]
 
 
 class ClassCreate(BaseModel):
@@ -24,7 +27,7 @@ class AssignmentCreate(BaseModel):
     learning_objective: str = Field(min_length=1, max_length=4000)
     grade_level: str = Field(min_length=1, max_length=40)
     instructions: str | None = Field(default=None, max_length=4000)
-    sandbox_type: str
+    sandbox_type: SandboxType
 
 
 class AssignmentUpdate(BaseModel):
@@ -33,7 +36,7 @@ class AssignmentUpdate(BaseModel):
     learning_objective: str | None = Field(default=None, min_length=1, max_length=4000)
     grade_level: str | None = Field(default=None, min_length=1, max_length=40)
     instructions: str | None = Field(default=None, max_length=4000)
-    sandbox_type: str | None = None
+    sandbox_type: SandboxType | None = None
 
 
 class InterestsRequest(BaseModel):
