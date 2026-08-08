@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sandbox_type": "parameter_explorer",
+  "visual_theme": "pulley",
+  "title": "Pulley Work Done Lab",
+  "introduction": "Explore how the pulling force and lifting distance set the work done raising a crate on a pulley.",
+  "formula_id": "work_done",
+  "variables": [
+    { "id": "force", "label": "Pulling force", "unit": "N", "min": 50, "max": 500, "step": 10, "default": 150, "editable": true },
+    { "id": "distance", "label": "Lifting distance", "unit": "m", "min": 0.5, "max": 8, "step": 0.5, "default": 3, "editable": true }
+  ],
+  "guided_steps": [
+    { "id": "step-1", "instruction": "Change the pulling force and observe how the work done changes.", "completion_checks": [{ "type": "value_changed", "variable_id": "force" }] },
+    { "id": "step-2", "instruction": "Change the lifting distance and watch the crate rise higher.", "completion_checks": [{ "type": "value_changed", "variable_id": "distance" }] },
+    { "id": "step-3", "instruction": "Explain how force and distance together determine the work done.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
+  ],
+  "completion_rules": [{ "type": "all_steps_completed" }],
+  "reflection_questions": [{ "id": "reflection-1", "question": "What happens to the work done as the lifting distance increases while the force stays constant?" }]
+}

@@ -1,6 +1,9 @@
-import type { SandboxSpec } from "./sandbox-types";
+import { getFormulaDefinition, isFormulaId } from "./formula-registry";
+import type { SandboxSpec, VisualTheme } from "./sandbox-types";
 
 const unsafeMarkers = ["<script", "javascript:", "import ", "exec(", "select "];
+
+const SUPPORTED_THEMES: VisualTheme[] = ["basketball", "formula1", "space", "sprint", "collision", "circuit", "pulley"];
 
 function safeText(value: unknown, field: string): string {
   if (typeof value !== "string" || value.trim().length === 0) {
@@ -21,10 +24,10 @@ export function validateSandboxSpec(value: unknown): SandboxSpec {
   }
   safeText(candidate.title, "title");
   safeText(candidate.introduction, "introduction");
-  if (candidate.formula_id !== "force_equals_mass_times_acceleration") {
+  if (!isFormulaId(candidate.formula_id)) {
     throw new Error("Unsupported sandbox formula.");
   }
-  if (candidate.visual_theme && !["basketball", "formula1", "space"].includes(candidate.visual_theme)) {
+  if (candidate.visual_theme && !SUPPORTED_THEMES.includes(candidate.visual_theme)) {
     throw new Error("Unsupported sandbox visual theme.");
   }
   if (!Array.isArray(candidate.variables) || candidate.variables.length < 2 || candidate.variables.length > 4) {
@@ -41,6 +44,13 @@ export function validateSandboxSpec(value: unknown): SandboxSpec {
     }
     if (variable.min > variable.max || variable.step <= 0 || variable.default < variable.min || variable.default > variable.max) {
       throw new Error("Sandbox variable range is invalid.");
+    }
+  }
+  // Every input the chosen formula consumes must be present as a variable so the
+  // pure calculator can never receive an undefined value at render time.
+  for (const input of getFormulaDefinition(candidate.formula_id).inputs) {
+    if (!variableIds.has(input)) {
+      throw new Error(`Sandbox is missing the "${input}" variable required by its formula.`);
     }
   }
   if (!Array.isArray(candidate.guided_steps) || candidate.guided_steps.length < 2 || candidate.guided_steps.length > 8) {

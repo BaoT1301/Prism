@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sandbox_type": "parameter_explorer",
+  "visual_theme": "collision",
+  "title": "Cart Collision Momentum Lab",
+  "introduction": "Explore how the mass and velocity of a rolling cart set the momentum it delivers into the bumper.",
+  "formula_id": "momentum",
+  "variables": [
+    { "id": "mass", "label": "Cart mass", "unit": "kg", "min": 500, "max": 2000, "step": 50, "default": 1200, "editable": true },
+    { "id": "velocity", "label": "Cart velocity", "unit": "m/s", "min": 1, "max": 20, "step": 1, "default": 12, "editable": true }
+  ],
+  "guided_steps": [
+    { "id": "step-1", "instruction": "Change the cart mass and observe how the momentum changes.", "completion_checks": [{ "type": "value_changed", "variable_id": "mass" }] },
+    { "id": "step-2", "instruction": "Change the cart velocity and observe the momentum it carries.", "completion_checks": [{ "type": "value_changed", "variable_id": "velocity" }] },
+    { "id": "step-3", "instruction": "Explain how mass and velocity together set the momentum.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
+  ],
+  "completion_rules": [{ "type": "all_steps_completed" }],
+  "reflection_questions": [{ "id": "reflection-1", "question": "What happens to momentum as the cart's velocity increases while its mass stays constant?" }]
+}

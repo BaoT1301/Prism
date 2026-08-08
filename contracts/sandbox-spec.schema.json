@@ -43,7 +43,11 @@
     },
     "formula_id": {
       "enum": [
-        "force_equals_mass_times_acceleration"
+        "force_equals_mass_times_acceleration",
+        "kinetic_energy",
+        "momentum",
+        "ohms_law",
+        "work_done"
       ]
     },
     "variables": {

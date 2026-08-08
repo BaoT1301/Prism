@@ -1,6 +1,18 @@
 export type SandboxType = "parameter_explorer";
-export type FormulaId = "force_equals_mass_times_acceleration";
-export type VisualTheme = "basketball" | "formula1" | "space";
+export type FormulaId =
+  | "force_equals_mass_times_acceleration"
+  | "kinetic_energy"
+  | "momentum"
+  | "ohms_law"
+  | "work_done";
+export type VisualTheme =
+  | "basketball"
+  | "formula1"
+  | "space"
+  | "sprint"
+  | "collision"
+  | "circuit"
+  | "pulley";
 
 export interface SandboxVariable {
   id: string;

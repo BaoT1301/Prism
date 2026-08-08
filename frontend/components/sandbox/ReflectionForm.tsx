@@ -1,9 +1,22 @@
 import type { ReflectionAnswer, ReflectionQuestion } from "../../features/sandbox/sandbox-types";
 
-const choices = ["Force increases", "Force decreases", "Force stays the same"];
-const choicePrefix = /^(Force increases|Force decreases|Force stays the same)\.\s*/;
+/** The three multiple-choice stems, phrased around the formula's output noun. */
+function choicesFor(outputNoun: string): string[] {
+  return [`${outputNoun} increases`, `${outputNoun} decreases`, `${outputNoun} stays the same`];
+}
 
-export function ReflectionForm({ questions, answers, onChange }: { questions: ReflectionQuestion[]; answers: ReflectionAnswer[]; onChange: (answers: ReflectionAnswer[]) => void }) {
+export function ReflectionForm({
+  questions,
+  answers,
+  onChange,
+  outputNoun = "Force",
+}: {
+  questions: ReflectionQuestion[];
+  answers: ReflectionAnswer[];
+  onChange: (answers: ReflectionAnswer[]) => void;
+  outputNoun?: string;
+}) {
+  const choices = choicesFor(outputNoun);
   const setAnswer = (questionId: string, answer: string) => onChange([...answers.filter((item) => item.question_id !== questionId), { question_id: questionId, answer }]);
 
   return (
@@ -13,7 +26,8 @@ export function ReflectionForm({ questions, answers, onChange }: { questions: Re
       {questions.map((question) => {
         const current = answers.find((answer) => answer.question_id === question.id)?.answer ?? "";
         const selected = choices.find((choice) => current.startsWith(choice));
-        const explanation = current.replace(choicePrefix, "");
+        // Strip the "<choice>. " prefix to recover just the free-text explanation.
+        const explanation = selected ? current.slice(selected.length).replace(/^\.\s*/, "") : current;
         const headingId = `reflection-question-${question.id}`;
         // Re-compose the stored answer as "<choice>. <explanation>", preserving
         // whichever side was not just edited so switching a choice never wipes text.

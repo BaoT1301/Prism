@@ -20,6 +20,10 @@ export default defineConfig({
     baseURL: "http://localhost:5173",
     trace: "on-first-retry",
     headless: true,
+    // The playground has continuous ambient motion; emulating reduced-motion
+    // (which the app honors) keeps interactions deterministic in CI and also
+    // exercises the reduced-motion code path.
+    reducedMotion: "reduce",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {

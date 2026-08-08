@@ -6,13 +6,16 @@ import { GuidedSteps } from "../../components/sandbox/GuidedSteps";
 import { HintPanel } from "../../components/sandbox/HintPanel";
 import { PhysicsScene } from "../../components/sandbox/PhysicsScene";
 import { ReflectionForm } from "../../components/sandbox/ReflectionForm";
+import { RelationshipGraph } from "../../components/sandbox/RelationshipGraph";
+import { RunHistory } from "../../components/sandbox/RunHistory";
 import { SaveStatus } from "../../components/sandbox/SaveStatus";
 import { VariableSlider } from "../../components/sandbox/VariableSlider";
 import { toFiniteNumber } from "../../lib/guards";
 import type { SandboxApi } from "../../lib/sandbox/sandbox-api";
 import { mergeCompletedStepIds } from "./completion";
-import { calculateFormula } from "./formula-registry";
+import { calculateFormula, getFormulaDefinition } from "./formula-registry";
 import { buildProgressRequest, progressPercentage } from "./progress";
+import type { RunSnapshot } from "./relationship-graph";
 import { createSerialRunner, isConflictError, type LocalEdits, rebaseOntoServer, sanitizeSession } from "./session-sync";
 import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec } from "./sandbox-types";
 
@@ -49,6 +52,8 @@ export function ParameterExplorer({
     startSession.status === "submitted" ? startSession.submitted_at : undefined,
   );
   const [runToken, setRunToken] = useState(0);
+  const [runs, setRuns] = useState<RunSnapshot[]>([]);
+  const runIdRef = useRef(0);
   const firstRender = useRef(true);
   const debounceRef = useRef<number | undefined>(undefined);
   // Authoritative view of the persisted session (version source of truth).
@@ -57,8 +62,24 @@ export function ParameterExplorer({
   const latestRef = useRef<LocalEdits>({ completedStepIds, responses: values, reflectionAnswers });
   latestRef.current = { completedStepIds, responses: values, reflectionAnswers };
 
+  const formula = useMemo(() => getFormulaDefinition(spec.formula_id), [spec.formula_id]);
   const result = useMemo(() => calculateFormula(spec.formula_id, values), [spec.formula_id, values]);
+  const sweepableIds = useMemo(() => {
+    const declared = new Set(spec.variables.map((variable) => variable.id));
+    const inputs = formula.inputs.filter((id) => declared.has(id));
+    return inputs.length > 0 ? inputs : spec.variables.map((variable) => variable.id);
+  }, [formula.inputs, spec.variables]);
+  const [sweptId, setSweptId] = useState<string>(() => sweepableIds[0]);
+  const activeSweptId = sweepableIds.includes(sweptId) ? sweptId : sweepableIds[0];
   const automaticIds = useMemo(() => spec.guided_steps.filter((step) => (step.completion_checks?.length ?? 0) > 0).map((step) => step.id), [spec]);
+
+  // A "Run" replays the scene *and* snapshots the current inputs/output so past
+  // experiments can be compared on the graph and in the run-history list.
+  const runExperiment = useCallback(() => {
+    setRunToken((token) => token + 1);
+    runIdRef.current += 1;
+    setRuns((previous) => [...previous, { id: runIdRef.current, values: { ...values }, result, sweptId: activeSweptId }].slice(-8));
+  }, [activeSweptId, result, values]);
   const percentage = progressPercentage(spec.guided_steps, completedStepIds);
   const missionComplete = percentage === 100;
 
@@ -176,19 +197,27 @@ export function ParameterExplorer({
         <div className="sandbox-dashboard">
           <div className="simulation-column">
             <PhysicsScene spec={spec} values={values} runToken={runToken} />
-            <div className="simulation-action"><div><p className="card-kicker">Ready when you are</p><strong>Change a variable, then run the experiment.</strong></div><button className="primary-button" type="button" data-testid="run-experiment" onClick={() => setRunToken((token) => token + 1)}>Run experiment <span aria-hidden="true">→</span></button></div>
+            <div className="simulation-action"><div><p className="card-kicker">Ready when you are</p><strong>Change a variable, then run the experiment.</strong></div><button className="primary-button" type="button" data-testid="run-experiment" onClick={runExperiment}>Run experiment <span aria-hidden="true">→</span></button></div>
+            <RelationshipGraph formula={formula} variables={spec.variables} values={values} result={result} sweptId={activeSweptId} onSweptChange={setSweptId} runs={runs} />
+            <RunHistory runs={runs} formula={formula} variables={spec.variables} onClear={() => setRuns([])} />
           </div>
           <aside className="coach-column">
             <HintPanel hint={hint} remaining={hint?.remaining_hint_levels ?? Math.max(0, 3 - session.hints_used)} onRequest={requestHint} />
             {hintError && <p className="inline-error" role="alert">{hintError}</p>}
-            <div className="objective-card"><p className="card-kicker">Learning objective</p><p>{spec.introduction}</p><span className="objective-tag">F = ma</span></div>
+            <div className="objective-card"><p className="card-kicker">Learning objective</p><p>{spec.introduction}</p><span className="objective-tag">{formula.expression}</span></div>
           </aside>
         </div>
 
         <section className="controls-card">
-          <div className="section-heading"><div><p className="card-kicker">Physics controls</p><h2>Shape the experiment.</h2></div><div className="formula-display"><span>Force = Mass × Acceleration</span><strong>{result.toFixed(2)} N</strong></div></div>
+          <div className="section-heading"><div><p className="card-kicker">Physics controls</p><h2>Shape the experiment.</h2></div><div className="formula-display"><span>{formula.label} · {formula.expression}</span><strong>{result.toFixed(2)} {formula.output.unit}</strong></div></div>
           <div className="variable-grid">{spec.variables.map((variable) => <VariableSlider key={variable.id} variable={variable} value={values[variable.id]} onChange={(value) => setValues((current) => ({ ...current, [variable.id]: value }))} />)}</div>
-          <div className="physics-hud"><div><span>Mass</span><strong>{values.mass} <small>kg</small></strong></div><div><span>Acceleration</span><strong>{values.acceleration} <small>m/s²</small></strong></div><div className="hud-force"><span>Force</span><strong>{result.toFixed(2)} <small>N</small></strong></div></div>
+          <div className="physics-hud">
+            {formula.inputs.map((inputId) => {
+              const variable = spec.variables.find((item) => item.id === inputId);
+              return <div key={inputId}><span>{variable?.label ?? inputId}</span><strong>{values[inputId]} <small>{variable?.unit ?? ""}</small></strong></div>;
+            })}
+            <div className="hud-force"><span>{formula.output.label}</span><strong>{result.toFixed(2)} <small>{formula.output.unit}</small></strong></div>
+          </div>
         </section>
 
         <section className="mission-card">
@@ -197,7 +226,7 @@ export function ParameterExplorer({
           <GuidedSteps steps={spec.guided_steps} completedStepIds={completedStepIds} automaticStepIds={automaticIds} onToggle={(id) => setCompletedStepIds((current) => current.includes(id) ? current.filter((stepId) => stepId !== id) : [...current, id])} />
         </section>
 
-        <ReflectionForm questions={spec.reflection_questions} answers={reflectionAnswers} onChange={setReflectionAnswers} />
+        <ReflectionForm questions={spec.reflection_questions} answers={reflectionAnswers} onChange={setReflectionAnswers} outputNoun={formula.output.label} />
         {submitError && <p className="notice" role="alert">{submitError}</p>}
         <div className="completion-bar">
           <SaveStatus status={saveStatus} />

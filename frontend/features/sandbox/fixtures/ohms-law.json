@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sandbox_type": "parameter_explorer",
+  "visual_theme": "circuit",
+  "title": "Circuit Ohm's Law Lab",
+  "introduction": "Explore how the current and resistance in a simple circuit set the voltage that lights the lamp.",
+  "formula_id": "ohms_law",
+  "variables": [
+    { "id": "current", "label": "Current", "unit": "A", "min": 0.1, "max": 5, "step": 0.1, "default": 2, "editable": true },
+    { "id": "resistance", "label": "Resistance", "unit": "Ω", "min": 10, "max": 500, "step": 10, "default": 220, "editable": true }
+  ],
+  "guided_steps": [
+    { "id": "step-1", "instruction": "Change the current and watch how the voltage across the resistor responds.", "completion_checks": [{ "type": "value_changed", "variable_id": "current" }] },
+    { "id": "step-2", "instruction": "Change the resistance and watch the lamp brighten or dim.", "completion_checks": [{ "type": "value_changed", "variable_id": "resistance" }] },
+    { "id": "step-3", "instruction": "Explain how current and resistance combine to set the voltage.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
+  ],
+  "completion_rules": [{ "type": "all_steps_completed" }],
+  "reflection_questions": [{ "id": "reflection-1", "question": "What happens to the voltage as resistance increases while the current stays constant?" }]
+}

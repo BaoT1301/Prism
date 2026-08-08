@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "sandbox_type": "parameter_explorer",
+  "visual_theme": "sprint",
+  "title": "Sprinter Kinetic Energy Lab",
+  "introduction": "Explore how a sprinter's mass and running speed change the kinetic energy they carry down the track.",
+  "formula_id": "kinetic_energy",
+  "variables": [
+    { "id": "mass", "label": "Sprinter mass", "unit": "kg", "min": 40, "max": 120, "step": 5, "default": 70, "editable": true },
+    { "id": "velocity", "label": "Running speed", "unit": "m/s", "min": 2, "max": 12, "step": 0.5, "default": 8, "editable": true }
+  ],
+  "guided_steps": [
+    { "id": "step-1", "instruction": "Change the sprinter's mass and watch how the kinetic energy responds.", "completion_checks": [{ "type": "value_changed", "variable_id": "mass" }] },
+    { "id": "step-2", "instruction": "Increase the running speed and notice how sharply the energy climbs.", "completion_checks": [{ "type": "value_changed", "variable_id": "velocity" }] },
+    { "id": "step-3", "instruction": "Explain why speed matters more than mass for kinetic energy.", "completion_checks": [{ "type": "reflection_answered", "question_id": "reflection-1" }] }
+  ],
+  "completion_rules": [{ "type": "all_steps_completed" }],
+  "reflection_questions": [{ "id": "reflection-1", "question": "What happens to kinetic energy when the running speed increases while mass stays constant?" }]
+}

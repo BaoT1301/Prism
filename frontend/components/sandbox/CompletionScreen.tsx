@@ -18,8 +18,11 @@ export function CompletionScreen({
     timeStyle: "short",
   }).format(new Date(submittedAt));
 
+  const confetti = Array.from({ length: 14 }, (_, index) => index);
+
   return (
     <main className="completion-screen" data-testid="completion-screen">
+      <div className="completion-confetti" aria-hidden="true">{confetti.map((index) => <span key={index} className={`confetti-piece confetti-${index % 4}`} />)}</div>
       <section className="completion-card">
         <div className="completion-orbit" aria-hidden="true"><span /><span /><i>✦</i></div>
         <p className="eyebrow">Mission complete</p>
