@@ -2,6 +2,8 @@ import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef
 
 import { AppShell, PrismBrand, SessionExpired } from "../../components/AppChrome";
 import { AsyncState, Empty, Loading, Notice } from "../../components/AsyncState";
+import { AssignmentAnalyticsPanel } from "../../components/teacher/AssignmentAnalyticsPanel";
+import { SubmissionReview } from "../../components/teacher/SubmissionReview";
 import { ApiError, isAbortError, type AccessTokenProvider } from "../../lib/api-client";
 import { createTeacherApi, type Assignment, type AssignmentInput, type ClassInput } from "./teacher-api";
 
@@ -9,7 +11,8 @@ type TeacherApi = ReturnType<typeof createTeacherApi>;
 type Route =
   | { page: "dashboard" | "new-class" }
   | { page: "class" | "new-assignment"; classId: string }
-  | { page: "assignment"; assignmentId: string };
+  | { page: "assignment"; assignmentId: string }
+  | { page: "submission"; submissionId: string };
 
 const routeFor = (): Route => {
   const parts = location.hash.replace(/^#\//, "").split("/");
@@ -17,6 +20,7 @@ const routeFor = (): Route => {
   if (parts[0] === "classes" && parts[2] === "assignments" && parts[3] === "new") return { page: "new-assignment", classId: parts[1] };
   if (parts[0] === "classes" && parts[1]) return { page: "class", classId: parts[1] };
   if (parts[0] === "assignments" && parts[1]) return { page: "assignment", assignmentId: parts[1] };
+  if (parts[0] === "submissions" && parts[1]) return { page: "submission", submissionId: parts[1] };
   return { page: "dashboard" };
 };
 
@@ -112,6 +116,7 @@ export function TeacherApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
       {route.page === "class" && <ClassPage api={api} classId={route.classId} />}
       {route.page === "new-assignment" && <NewAssignment api={api} classId={route.classId} />}
       {route.page === "assignment" && <AssignmentPage api={api} assignmentId={route.assignmentId} />}
+      {route.page === "submission" && <SubmissionReviewPage api={api} submissionId={route.submissionId} />}
     </AppShell>
   );
 }
@@ -265,6 +270,8 @@ function NewAssignment({ api, classId }: { api: TeacherApi; classId: string }) {
 function AssignmentPage({ api, assignmentId }: { api: TeacherApi; assignmentId: string }) {
   const resource = useResource(() => api.assignment(assignmentId), `assignment-${assignmentId}`);
   const progress = useResource(() => api.progress(assignmentId), `progress-${assignmentId}`);
+  const analytics = useResource(() => api.analytics(assignmentId), `analytics-${assignmentId}`);
+  const submissions = useResource(() => api.submissions(assignmentId), `submissions-${assignmentId}`);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string>();
@@ -294,6 +301,12 @@ function AssignmentPage({ api, assignmentId }: { api: TeacherApi; assignmentId: 
           <dl className="details"><div><dt>Grade</dt><dd>{assignment.grade_level}</dd></div><div><dt>Experience</dt><dd>Parameter explorer</dd></div><div><dt>Version</dt><dd>{assignment.content_version}</dd></div><div><dt>Status</dt><dd>{assignment.status}{assignment.published_at ? ` · ${date(assignment.published_at)}` : ""}</dd></div><div className="detail-wide"><dt>Teacher instructions</dt><dd>{assignment.instructions || "No additional instructions."}</dd></div></dl>
         </section>
       )}
+      <section className="content-section">
+        <div className="section-title-row"><div><p className="eyebrow">Signal</p><h2>Assignment analytics</h2></div><span className="count-badge">{analytics.data ? `${Math.round(Math.min(1, Math.max(0, analytics.data.completion_rate)) * 100)}%` : "—"}</span></div>
+        <AsyncState loading={analytics.loading} error={analytics.error} isEmpty={!analytics.data} empty={<Empty title="No analytics yet.">Analytics appear once students begin this assignment.</Empty>}>
+          {analytics.data && <AssignmentAnalyticsPanel analytics={analytics.data} />}
+        </AsyncState>
+      </section>
       <section className="content-section submission-section">
         <div className="section-title-row"><div><p className="eyebrow">Class pulse</p><h2>Student progress</h2></div><span className="count-badge">{progress.data?.items.filter((student) => student.status === "submitted").length ?? 0} completed</span></div>
         <Notice error={progress.error} />
@@ -305,6 +318,35 @@ function AssignmentPage({ api, assignmentId }: { api: TeacherApi; assignmentId: 
           })}</ul>
         </AsyncState>
       </section>
+      <section className="content-section submission-section">
+        <div className="section-title-row"><div><p className="eyebrow">Submitted work</p><h2>Submissions</h2></div><span className="count-badge">{submissions.data?.total ?? 0}</span></div>
+        <Notice error={submissions.error} />
+        <AsyncState loading={submissions.loading} isEmpty={!submissions.data?.items.length} empty={<Empty title="No submissions yet.">When students submit their work, it appears here to open and review.</Empty>}>
+          <ul className="submission-list">{submissions.data?.items.map((item, index) => (
+            <li key={item.submission_id}>
+              <span className="person-index">{String(index + 1).padStart(2, "0")}</span>
+              <div className="progress-student"><strong>{item.student_name}</strong><small>{item.submitted_at ? `Submitted ${date(item.submitted_at)}` : "Not submitted"}</small></div>
+              {item.review ? <span className="status-pill submitted">Reviewed{item.review.score != null ? ` · ${item.review.score}` : ""}</span> : <span className="status-pill in_progress">Needs review</span>}
+              <button className="secondary-button" onClick={() => go(`/submissions/${item.submission_id}`)}>Review</button>
+            </li>
+          ))}</ul>
+        </AsyncState>
+      </section>
+    </section>
+  );
+}
+
+function SubmissionReviewPage({ api, submissionId }: { api: TeacherApi; submissionId: string }) {
+  const resource = useResource(() => api.submissionDetail(submissionId), `submission-${submissionId}`);
+  if (resource.loading) return <Loading label="Opening submission..." />;
+  const detail = resource.data;
+  if (!detail) return <Notice error={resource.error} />;
+  const backHref = detail.assignment_id ? `#/assignments/${detail.assignment_id}` : "#/";
+  return (
+    <section className="page-stack">
+      <PageBack href={backHref}>Assignment</PageBack>
+      <div className="page-intro"><p className="eyebrow">Submission review</p><h1>Review &amp; respond.</h1><p>See exactly what this student explored, then leave a score and feedback they can act on.</p></div>
+      <SubmissionReview detail={detail} onSave={(body) => api.saveReview(submissionId, body)} />
     </section>
   );
 }

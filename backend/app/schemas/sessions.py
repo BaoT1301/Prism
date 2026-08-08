@@ -66,6 +66,9 @@ class SubmissionSummaryResponse(BaseModel):
     student_name: str
     status: str
     submitted_at: datetime | None
+    # Present so the teacher submissions list reflects grading state without a
+    # per-row detail fetch. Forward-referenced; resolved via model_rebuild below.
+    review: "SubmissionReviewResponse | None" = None
 
 
 class SubmissionListResponse(BaseModel):
@@ -86,3 +89,87 @@ class AssignmentProgressResponse(BaseModel):
 class AssignmentProgressListResponse(BaseModel):
     items: list[AssignmentProgressResponse]
     total: int = Field(ge=0)
+
+
+# --- Phase 2: teacher analytics ------------------------------------------------------
+
+
+class AnalyticsFunnel(BaseModel):
+    not_started: int = Field(ge=0)
+    in_progress: int = Field(ge=0)
+    submitted: int = Field(ge=0)
+
+
+class AnalyticsHints(BaseModel):
+    average: float = Field(ge=0)
+    max: int = Field(ge=0)
+
+
+class ReflectionChoice(BaseModel):
+    label: str
+    count: int = Field(ge=0)
+
+
+class ReflectionBreakdownItem(BaseModel):
+    question_id: str
+    prompt: str
+    responses: int = Field(ge=0)
+    choices: list[ReflectionChoice]
+
+
+class AssignmentAnalyticsResponse(BaseModel):
+    assignment_id: str
+    roster_total: int = Field(ge=0)
+    funnel: AnalyticsFunnel
+    completion_rate: float = Field(ge=0)
+    hints: AnalyticsHints
+    median_seconds_to_submit: int | None
+    reflection_breakdown: list[ReflectionBreakdownItem]
+
+
+# --- Phase 2: grading / feedback -----------------------------------------------------
+
+
+class ReviewRequest(BaseModel):
+    # score omitted/null means "reviewed without a numeric grade"; out-of-range -> 422.
+    score: int | None = Field(default=None, ge=0, le=100)
+    feedback: str = Field(default="", max_length=5000)
+
+
+class SubmissionReviewResponse(BaseModel):
+    id: uuid.UUID
+    submission_id: uuid.UUID
+    score: int | None
+    feedback: str
+    reviewer_name: str
+    reviewed_at: datetime
+
+
+# Resolve the forward reference on SubmissionSummaryResponse now that
+# SubmissionReviewResponse exists in the module namespace.
+SubmissionSummaryResponse.model_rebuild()
+
+
+class SubmissionDetailResponse(BaseModel):
+    id: uuid.UUID
+    assignment_id: uuid.UUID
+    student_id: uuid.UUID
+    student_name: str
+    status: str
+    submitted_at: datetime
+    responses_snapshot: dict[str, Any]
+    reflection_answers: list[dict[str, Any]]
+    review: SubmissionReviewResponse | None
+
+
+class StudentSubmissionReview(BaseModel):
+    score: int | None
+    feedback: str
+    reviewed_at: datetime
+
+
+class StudentSubmissionItem(BaseModel):
+    assignment_id: uuid.UUID
+    assignment_title: str
+    submitted_at: datetime
+    review: StudentSubmissionReview | None

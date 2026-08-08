@@ -20,6 +20,16 @@ export function ensureItems<T>(value: { items?: T[] } | null | undefined): T[] {
 }
 
 /**
+ * Guarantees a plain array so callers can safely `.map`, regardless of backend
+ * drift. Unlike `ensureItems`, this guards a value that is *itself* the array
+ * (e.g. a bare-array endpoint or a nested `choices` field), not a `{ items }`
+ * wrapper. Anything non-array degrades to `[]`.
+ */
+export function ensureArray<T>(value: T[] | null | undefined): T[] {
+  return Array.isArray(value) ? value : [];
+}
+
+/**
  * Coerces a numeric-looking value to a finite number, falling back otherwise.
  * Only numbers and non-empty numeric strings are accepted — `null`, `undefined`,
  * `""`, and booleans return the fallback (rather than JS's surprising `Number(null) === 0`).

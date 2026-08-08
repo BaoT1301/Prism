@@ -522,3 +522,80 @@ input:disabled { border-style: dashed; color: var(--muted); background: rgba(23,
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   .skeleton-card { animation: none; }
 }
+
+/* Teacher analytics — hand-built funnel + choice bars, editorial figures */
+.analytics-panel { display: grid; gap: 1.2rem; }
+.analytics-figures { display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; border: 1px solid var(--line-strong); border-radius: var(--radius-lg); overflow: hidden; background: var(--paper-light); }
+.analytics-figure { display: flex; min-height: 8.5rem; padding: 1.5rem; border-right: 1px solid var(--line); flex-direction: column; justify-content: center; gap: 0.4rem; }
+.analytics-figure:last-child { border-right: 0; }
+.analytics-figure-lead { background: var(--lavender-light); }
+.analytics-figure-value { font-family: var(--display); font-size: clamp(2.1rem, 3.6vw, 3.2rem); font-weight: 400; line-height: 1; font-variant-numeric: tabular-nums; }
+.analytics-figure-lead .analytics-figure-value { color: var(--indigo); font-size: clamp(2.9rem, 5.4vw, 4.4rem); }
+.analytics-figure-label { color: var(--muted); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.analytics-funnel, .analytics-reflections { padding: clamp(1.5rem, 3vw, 2.3rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--paper-light); }
+.analytics-subhead { display: flex; margin-bottom: 1.4rem; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.analytics-subhead .card-kicker { margin: 0; }
+.analytics-subhead > span { color: var(--muted); font-size: 0.78rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.funnel-bars, .choice-bars { display: grid; margin: 0; padding: 0; list-style: none; gap: 0.9rem; }
+.funnel-row, .choice-row { display: grid; grid-template-columns: minmax(7rem, 0.9fr) minmax(0, 2.4fr) auto; align-items: center; gap: 1rem; }
+.funnel-label, .choice-label { font-size: 0.82rem; font-weight: 700; }
+.funnel-track, .choice-track { height: 0.85rem; border-radius: 999px; background: #e8e3d7; overflow: hidden; }
+.funnel-track span, .choice-track span { display: block; height: 100%; border-radius: inherit; transition: width 320ms ease; }
+.funnel-count, .choice-count { min-width: 2.2rem; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.funnel-submitted .funnel-track span { background: #7fae57; }
+.funnel-in_progress .funnel-track span { background: #e6b23e; }
+.funnel-not_started .funnel-track span { background: #b8b1a2; }
+.choice-track span { background: var(--indigo); }
+.reflection-breakdown + .reflection-breakdown { margin-top: 1.8rem; padding-top: 1.6rem; border-top: 1px solid var(--line); }
+.reflection-breakdown-head { display: flex; margin-bottom: 1rem; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.reflection-breakdown-head h4 { margin: 0; font-family: var(--display); font-size: 1.35rem; font-weight: 400; }
+.reflection-breakdown-head span { color: var(--muted); font-size: 0.74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Teacher submission review */
+.submission-review { display: grid; gap: 1.2rem; }
+.review-summary { display: flex; padding: clamp(1.6rem, 4vw, 2.6rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); align-items: flex-end; justify-content: space-between; gap: 1.5rem; background: var(--lavender-light); }
+.review-summary h3 { margin: 0.3rem 0; font-family: var(--display); font-size: clamp(2rem, 4vw, 3rem); font-weight: 400; }
+.review-summary .card-kicker { margin: 0; }
+.review-summary p:not(.card-kicker) { margin: 0; }
+.review-status { align-self: center; }
+.review-evidence { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; }
+.review-block { padding: clamp(1.4rem, 3vw, 2rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--paper-light); }
+.review-block .card-kicker { margin-bottom: 1rem; }
+.review-responses { display: grid; grid-template-columns: repeat(2, 1fr); margin: 0; gap: 0.7rem; }
+.review-responses > div { padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(245,241,231,0.5); }
+.review-responses dt { margin-bottom: 0.25rem; color: var(--muted); font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; word-break: break-word; }
+.review-responses dd { margin: 0; font-family: var(--display); font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+.review-reflections { display: grid; margin: 0; padding: 0; gap: 0.9rem; list-style: none; }
+.review-reflections li { padding: 0.9rem 1rem; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(245,241,231,0.5); }
+.review-reflection-index { display: block; margin-bottom: 0.35rem; color: var(--indigo); font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; }
+.review-reflections p { margin: 0; line-height: 1.5; }
+.review-form { padding: clamp(1.6rem, 4vw, 3rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--paper-light); }
+.review-form-grid { display: grid; grid-template-columns: 12rem 1fr; gap: 1.2rem; align-items: start; }
+.review-form-grid input { font-variant-numeric: tabular-nums; }
+
+/* Student feedback */
+.feedback-list { display: grid; margin: 0; padding: 0; list-style: none; gap: 1rem; }
+.feedback-card { padding: clamp(1.5rem, 3.5vw, 2.3rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--paper-light); }
+.feedback-card-head { display: flex; margin-bottom: 1rem; align-items: flex-start; justify-content: space-between; gap: 1.2rem; }
+.feedback-card-head h3 { margin: 0; font-family: var(--display); font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 400; line-height: 0.95; }
+.feedback-score { display: inline-flex; align-items: baseline; gap: 0.25rem; padding: 0.5rem 0.9rem; border-radius: var(--radius-sm); color: var(--indigo-dark); background: var(--lime); white-space: nowrap; }
+.feedback-score strong { font-family: var(--display); font-size: 1.9rem; font-weight: 400; font-variant-numeric: tabular-nums; }
+.feedback-score small { font-size: 0.7rem; font-weight: 700; }
+.feedback-note { margin: 0; color: var(--ink); line-height: 1.6; }
+.feedback-meta { margin: 0.9rem 0 0; color: var(--muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.06em; }
+
+@media (max-width: 1050px) {
+  .analytics-figures { grid-template-columns: 1fr 1fr; }
+  .analytics-figure:nth-child(2) { border-right: 0; }
+  .review-evidence { grid-template-columns: 1fr; }
+}
+@media (max-width: 700px) {
+  .analytics-figures { grid-template-columns: 1fr; }
+  .analytics-figure { border-right: 0; border-bottom: 1px solid var(--line); }
+  .analytics-figure:last-child { border-bottom: 0; }
+  .funnel-row, .choice-row { grid-template-columns: minmax(5.5rem, 0.9fr) 1fr auto; }
+  .review-summary { align-items: flex-start; flex-direction: column; }
+  .review-responses { grid-template-columns: 1fr; }
+  .review-form-grid { grid-template-columns: 1fr; }
+  .feedback-card-head { align-items: flex-start; flex-direction: column; }
+}

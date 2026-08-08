@@ -2,11 +2,13 @@ import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react
 
 import { AppShell, SessionExpired } from "../../components/AppChrome";
 import { AsyncState, Skeleton } from "../../components/AsyncState";
+import { StudentFeedback } from "../../components/student/StudentFeedback";
 import { apiRequest, ApiError, isAbortError, type AccessTokenProvider } from "../../lib/api-client";
 import { ensureItems } from "../../lib/guards";
 import { createSandboxApi } from "../../lib/sandbox/sandbox-api";
 import { SandboxRenderer } from "../sandbox/SandboxRenderer";
 import type { SandboxLaunch } from "../sandbox/sandbox-types";
+import { createStudentApi, type StudentSubmission } from "./student-api";
 
 type ClassItem = { id: string; name: string; subject: string; grade_level: string };
 type Assignment = { id: string; title: string; topic: string; status: string };
@@ -54,7 +56,11 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
   const [savingInterests, setSavingInterests] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
   const [launchingId, setLaunchingId] = useState<string>();
+  const [feedback, setFeedback] = useState<StudentSubmission[]>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(true);
+  const [feedbackError, setFeedbackError] = useState<string>();
   const sandboxApi = useMemo(() => createSandboxApi(getAccessToken), [getAccessToken]);
+  const studentApi = useMemo(() => createStudentApi(getAccessToken), [getAccessToken]);
 
   const handleFailure = useCallback((reason: unknown) => {
     if (isAbortError(reason)) return; // superseded/cancelled request
@@ -105,6 +111,23 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
       .finally(() => { if (!controller.signal.aborted) setAssignmentsLoading(false); });
     return () => controller.abort();
   }, [getAccessToken, selected, handleFailure]);
+
+  // Feedback list loads independently so a slow/failed review fetch never blocks
+  // the main workspace. Auth failures still bubble to the shared expiry screen.
+  useEffect(() => {
+    const controller = new AbortController();
+    setFeedbackLoading(true);
+    setFeedbackError(undefined);
+    void studentApi.mySubmissions(controller.signal)
+      .then((items) => { if (!controller.signal.aborted) setFeedback(items); })
+      .catch((reason) => {
+        if (isAbortError(reason)) return;
+        if (reason instanceof ApiError && reason.isAuthError) { setAuthExpired(true); return; }
+        setFeedbackError(reason instanceof Error ? reason.message : "Could not load your feedback.");
+      })
+      .finally(() => { if (!controller.signal.aborted) setFeedbackLoading(false); });
+    return () => controller.abort();
+  }, [studentApi]);
 
   if (authExpired) return <SessionExpired onSignOut={onSignOut} />;
 
@@ -272,6 +295,8 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
           </AsyncState>
         </section>
       )}
+
+      <StudentFeedback submissions={feedback} loading={feedbackLoading} error={feedbackError} />
     </AppShell>
   );
 }

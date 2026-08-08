@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { ensureCollectionShape, ensureItems, toFiniteNumber } from "./guards";
+import { ensureArray, ensureCollectionShape, ensureItems, toFiniteNumber } from "./guards";
 
 describe("ensureCollectionShape", () => {
   it("never yields a non-array items field", () => {
@@ -21,6 +21,14 @@ describe("ensureItems", () => {
     expect(ensureItems(null)).toEqual([]);
     expect(ensureItems({})).toEqual([]);
     expect(ensureItems({ items: [1, 2] })).toEqual([1, 2]);
+  });
+});
+
+describe("ensureArray", () => {
+  it("returns the array when given one, otherwise an empty array", () => {
+    expect(ensureArray([1, 2, 3])).toEqual([1, 2, 3]);
+    expect(ensureArray(null)).toEqual([]);
+    expect(ensureArray(undefined)).toEqual([]);
   });
 });
 

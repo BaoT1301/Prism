@@ -197,6 +197,20 @@ class SandboxSession(Base):
     )
 
 
+class SubmissionReview(TimestampMixin, Base):
+    __tablename__ = "submission_reviews"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # One review per submission (upsert target). CASCADE so deleting a submission removes
+    # its review; the reviewer is RESTRICT because a graded teacher must not vanish.
+    submission_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("submissions.id", ondelete="CASCADE"), nullable=False, unique=True)
+    reviewer_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id", ondelete="RESTRICT"), nullable=False, index=True)
+    score: Mapped[int | None] = mapped_column(Integer)
+    feedback: Mapped[str] = mapped_column(Text, nullable=False, server_default="")
+    __table_args__ = (
+        CheckConstraint("score IS NULL OR (score >= 0 AND score <= 100)", name="ck_submission_reviews_score"),
+    )
+
+
 class Submission(Base):
     __tablename__ = "submissions"
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)

@@ -5,7 +5,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from app.api.dependencies.auth import get_student, get_teacher
 from app.api.dependencies.rate_limit import rate_limit
@@ -20,17 +20,24 @@ from app.models.models import (
     SandboxSession,
     SandboxSessionStatus,
     Submission,
+    SubmissionReview,
 )
 from app.schemas.sessions import (
+    AssignmentAnalyticsResponse,
     HintRequest,
     HintResponse,
     AssignmentProgressListResponse,
     ProgressRequest,
+    ReviewRequest,
     SandboxSessionResponse,
+    StudentSubmissionItem,
+    SubmissionDetailResponse,
     SubmissionListResponse,
     SubmissionResponse,
+    SubmissionReviewResponse,
     SubmitRequest,
 )
+from app.services.analytics import assignment_analytics
 from app.services.sandbox import automatic_step_ids, build_progressive_hint, submission_ready
 
 router = APIRouter(tags=["sessions"])
@@ -167,8 +174,29 @@ def submissions(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)
     if assignment is None or assignment.teacher_id != teacher.id:
         raise ApiError(404, "ASSIGNMENT_NOT_FOUND", "The requested assignment was not found.")
     total = db.scalar(select(func.count()).select_from(Submission).where(Submission.assignment_id == assignment_id)) or 0
-    rows = db.execute(select(Submission, Profile).join(Profile, Profile.id == Submission.student_id).where(Submission.assignment_id == assignment_id).order_by(Submission.submitted_at.desc()).limit(limit).offset(offset)).all()
-    return {"items": [{"submission_id": item.id, "student_id": item.student_id, "student_name": profile.display_name, "status": "submitted", "submitted_at": item.submitted_at} for item, profile in rows], "total": total}
+    reviewer = aliased(Profile)
+    rows = db.execute(
+        select(Submission, Profile, SubmissionReview, reviewer)
+        .join(Profile, Profile.id == Submission.student_id)
+        .outerjoin(SubmissionReview, SubmissionReview.submission_id == Submission.id)
+        .outerjoin(reviewer, reviewer.id == SubmissionReview.reviewer_id)
+        .where(Submission.assignment_id == assignment_id)
+        .order_by(Submission.submitted_at.desc())
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    items = [
+        {
+            "submission_id": item.id,
+            "student_id": item.student_id,
+            "student_name": profile.display_name,
+            "status": "submitted",
+            "submitted_at": item.submitted_at,
+            "review": _review_payload(review, reviewer_profile.display_name if reviewer_profile else "") if review is not None else None,
+        }
+        for item, profile, review, reviewer_profile in rows
+    ]
+    return {"items": items, "total": total}
 
 
 @router.get("/assignments/{assignment_id}/progress", response_model=AssignmentProgressListResponse)
@@ -222,3 +250,89 @@ def assignment_progress(assignment_id: uuid.UUID, db: Annotated[Session, Depends
             "submitted_at": submission.submitted_at if submission else None,
         })
     return {"items": items, "total": total}
+
+
+@router.get("/assignments/{assignment_id}/analytics", response_model=AssignmentAnalyticsResponse)
+def analytics(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    assignment = db.get(Assignment, assignment_id)
+    if assignment is None or assignment.teacher_id != teacher.id:
+        raise ApiError(404, "ASSIGNMENT_NOT_FOUND", "The requested assignment was not found.")
+    return assignment_analytics(db, assignment)
+
+
+def _owned_submission_for_teacher(db: Session, submission_id: uuid.UUID, teacher: Profile) -> tuple[Submission, Assignment]:
+    """Load a submission the caller may review, applying the 404-not-403 ownership rule."""
+    submission = db.get(Submission, submission_id)
+    if submission is None:
+        raise ApiError(404, "SUBMISSION_NOT_FOUND", "The requested submission was not found.")
+    assignment = db.get(Assignment, submission.assignment_id)
+    if assignment is None or assignment.teacher_id != teacher.id:
+        raise ApiError(404, "SUBMISSION_NOT_FOUND", "The requested submission was not found.")
+    return submission, assignment
+
+
+def _review_payload(review: SubmissionReview, reviewer_name: str) -> dict:
+    return {"id": review.id, "submission_id": review.submission_id, "score": review.score, "feedback": review.feedback, "reviewer_name": reviewer_name, "reviewed_at": review.updated_at}
+
+
+@router.put("/submissions/{submission_id}/review", response_model=SubmissionReviewResponse)
+def upsert_review(submission_id: uuid.UUID, data: ReviewRequest, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    submission, _ = _owned_submission_for_teacher(db, submission_id, teacher)
+    review = db.scalar(select(SubmissionReview).where(SubmissionReview.submission_id == submission.id))
+    if review is None:
+        review = SubmissionReview(submission_id=submission.id, reviewer_id=teacher.id, score=data.score, feedback=data.feedback)
+        db.add(review)
+        try:
+            db.commit()
+        except IntegrityError:
+            # A concurrent first review for the same submission won the unique(submission_id)
+            # race; fall through to updating the row that landed instead of raising a 500.
+            db.rollback()
+            review = db.scalar(select(SubmissionReview).where(SubmissionReview.submission_id == submission.id))
+            review.reviewer_id, review.score, review.feedback = teacher.id, data.score, data.feedback
+            db.commit()
+    else:
+        review.reviewer_id, review.score, review.feedback = teacher.id, data.score, data.feedback
+        db.commit()
+    db.refresh(review)
+    return _review_payload(review, teacher.display_name)
+
+
+@router.get("/submissions/{submission_id}", response_model=SubmissionDetailResponse)
+def submission_detail(submission_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    submission, _ = _owned_submission_for_teacher(db, submission_id, teacher)
+    student = db.get(Profile, submission.student_id)
+    review = db.scalar(select(SubmissionReview).where(SubmissionReview.submission_id == submission.id))
+    review_payload = None
+    if review is not None:
+        reviewer = db.get(Profile, review.reviewer_id)
+        review_payload = _review_payload(review, reviewer.display_name if reviewer else "")
+    return {
+        "id": submission.id,
+        "assignment_id": submission.assignment_id,
+        "student_id": submission.student_id,
+        "student_name": student.display_name if student else "",
+        "status": "submitted",
+        "submitted_at": submission.submitted_at,
+        "responses_snapshot": submission.responses_snapshot,
+        "reflection_answers": submission.reflection_answers,
+        "review": review_payload,
+    }
+
+
+@router.get("/me/submissions", response_model=list[StudentSubmissionItem])
+def my_submissions(db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)]):
+    rows = db.execute(
+        select(Submission, Assignment.title, SubmissionReview)
+        .join(Assignment, Assignment.id == Submission.assignment_id)
+        .outerjoin(SubmissionReview, SubmissionReview.submission_id == Submission.id)
+        .where(Submission.student_id == student.id)
+        .order_by(Submission.submitted_at.desc())
+    ).all()
+    items = []
+    for submission, title, review in rows:
+        review_payload = None
+        if review is not None:
+            review_payload = {"score": review.score, "feedback": review.feedback, "reviewed_at": review.updated_at}
+        items.append({"assignment_id": submission.assignment_id, "assignment_title": title, "submitted_at": submission.submitted_at, "review": review_payload})
+    return items
