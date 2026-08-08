@@ -190,3 +190,51 @@ def test_important_database_uniqueness_constraints(client):
     with pytest.raises(IntegrityError):
         db.commit()
     db.rollback()
+
+
+def test_request_id_injection_is_rejected_but_safe_values_pass(client):
+    test_client, _ = client
+    # A value with characters outside the allow-list (space/!) must not be echoed back (L3).
+    injected = test_client.get("/health", headers={"X-Request-ID": "not a valid id!"})
+    assert injected.headers["X-Request-ID"] != "not a valid id!"
+    # A well-formed correlation id is honored end to end.
+    safe = test_client.get("/health", headers={"X-Request-ID": "req-ok-123"})
+    assert safe.headers["X-Request-ID"] == "req-ok-123"
+
+
+def test_list_classes_is_paginated_with_accurate_total(client):
+    test_client, _ = client
+    assert test_client.post("/api/v1/profiles/bootstrap", headers=auth(), json={"display_name": "Bao", "role": "teacher"}).status_code == 201
+    for index in range(3):
+        assert test_client.post("/api/v1/classes", headers=auth(), json={"name": f"Class {index}", "subject": "Physics", "grade_level": "10"}).status_code == 201
+    first = test_client.get("/api/v1/classes?limit=2&offset=0", headers=auth()).json()
+    assert len(first["items"]) == 2 and first["total"] == 3
+    second = test_client.get("/api/v1/classes?limit=2&offset=2", headers=auth()).json()
+    assert len(second["items"]) == 1 and second["total"] == 3
+
+
+def test_bootstrap_is_rate_limited(client):
+    test_client, _ = client
+    payload = {"display_name": "Bao", "role": "teacher"}
+    statuses = [test_client.post("/api/v1/profiles/bootstrap", headers=auth(), json=payload).status_code for _ in range(11)]
+    assert statuses[-1] == 429  # capacity is 10 per minute per caller
+    assert statuses.count(429) == 1
+
+
+def test_token_bucket_limiter_denies_after_capacity_then_refills():
+    from app.api.dependencies.rate_limit import TokenBucketLimiter
+
+    limiter = TokenBucketLimiter()
+    assert all(limiter.allow("k", capacity=3, refill_per_second=0.0, now=100.0) for _ in range(3))
+    assert not limiter.allow("k", capacity=3, refill_per_second=0.0, now=100.0)
+    assert limiter.allow("k", capacity=3, refill_per_second=1.0, now=101.5)
+
+
+def test_join_code_uses_unambiguous_fixed_alphabet():
+    from app.services.domain import _JOIN_CODE_ALPHABET, _JOIN_CODE_LENGTH, generate_join_code
+
+    assert not set("O0I1L") & set(_JOIN_CODE_ALPHABET)
+    for _ in range(200):
+        code = generate_join_code()
+        assert len(code) == _JOIN_CODE_LENGTH
+        assert set(code) <= set(_JOIN_CODE_ALPHABET)

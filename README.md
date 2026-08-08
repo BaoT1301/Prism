@@ -13,7 +13,7 @@ Prism lets a teacher set one learning objective, then gives each student a safe,
 5. Change variables, request a hint, complete the guided steps and reflection, then submit.
 6. Return to the teacher workspace to see the student's submission status.
 
-The public fixture-backed sandbox demo is also available at `sandbox-demo.html` after starting Vite. It needs no sign-in or external API call.
+The public fixture-backed sandbox demo is also available at [`/sandbox-demo.html`](sandbox-demo.html) after starting Vite — open `http://localhost:5173/sandbox-demo.html`. It needs no sign-in or external API call, which makes it the target for headless end-to-end tests.
 
 ## Architecture and safety
 

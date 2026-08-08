@@ -156,6 +156,10 @@ class GeneratedAssignment(Base):
     failure_message: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Lease timestamp for an in-flight PENDING generation (H2). A crashed worker leaves
+    # a stale PENDING row; once this instant passes the row is reclaimable instead of
+    # locking the student out of the assignment forever.
+    pending_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         UniqueConstraint("assignment_id", "assignment_content_version", "student_id", "interest_profile_version", name="uq_generated_assignment_cache"),
         Index("ix_generated_assignments_student_created", "student_id", "created_at"),
@@ -181,7 +185,9 @@ class SandboxSession(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # M4: onupdate keeps updated_at fresh on ORM flushes; the bulk UPDATE in
+    # update_progress sets it explicitly since Core updates bypass the ORM onupdate.
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     __table_args__ = (
         UniqueConstraint("generated_assignment_id", "student_id", name="uq_sandbox_session_generation_student"),
         CheckConstraint("version >= 1", name="ck_sandbox_sessions_version"),
@@ -204,4 +210,5 @@ class Submission(Base):
     __table_args__ = (
         UniqueConstraint("assignment_id", "student_id", name="uq_submission_assignment_student"),
         Index("ix_submissions_assignment_submitted", "assignment_id", "submitted_at"),
+        Index("ix_submissions_generated_assignment_id", "generated_assignment_id"),
     )

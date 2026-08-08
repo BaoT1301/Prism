@@ -12,11 +12,21 @@ from app.schemas.domain import AssignmentCreate, AssignmentUpdate, ClassCreate, 
 
 SUPPORTED_SANDBOXES = {"parameter_explorer"}
 
+# Unambiguous, fixed uppercase alphabet for join codes (M2). Excludes visually confusable
+# characters (0/O, 1/I/L) and preserves full per-character entropy — unlike the previous
+# base64 `.upper()[:8]`, which collapsed case and roughly halved the letter entropy.
+_JOIN_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
+_JOIN_CODE_LENGTH = 8
+
+
+def generate_join_code() -> str:
+    return "".join(secrets.choice(_JOIN_CODE_ALPHABET) for _ in range(_JOIN_CODE_LENGTH))
+
 
 class DomainService:
     def create_class(self, db: Session, teacher: Profile, data: ClassCreate) -> Class:
         for _ in range(5):
-            item = Class(teacher_id=teacher.id, **data.model_dump(), join_code=secrets.token_urlsafe(6).upper()[:8])
+            item = Class(teacher_id=teacher.id, **data.model_dump(), join_code=generate_join_code())
             db.add(item)
             try:
                 db.commit()

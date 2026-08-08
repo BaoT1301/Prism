@@ -3,10 +3,12 @@ from datetime import datetime, UTC
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_student, get_teacher
+from app.api.dependencies.rate_limit import rate_limit
 from app.core.errors import ApiError
 from app.db.session import get_db
 from app.models.models import (
@@ -32,6 +34,13 @@ from app.schemas.sessions import (
 from app.services.sandbox import automatic_step_ids, build_progressive_hint, submission_ready
 
 router = APIRouter(tags=["sessions"])
+
+DEFAULT_PAGE_SIZE = 50
+MAX_PAGE_SIZE = 200
+
+
+def _page(limit: int, offset: int) -> tuple[int, int]:
+    return max(1, min(limit, MAX_PAGE_SIZE)), max(0, offset)
 
 
 def owned_session(db: Session, session_id: uuid.UUID, student: Profile) -> tuple[SandboxSession, GeneratedAssignment]:
@@ -82,7 +91,7 @@ def update_progress(session_id: uuid.UUID, data: ProgressRequest, db: Annotated[
         variable = valid_variables.get(key)
         if variable is None or not isinstance(value, (int, float)) or not variable["min"] <= value <= variable["max"]:
             raise ApiError(422, "INVALID_RESPONSE", "Responses must match configured variable ranges.")
-    result = db.execute(update(SandboxSession).where(SandboxSession.id == item.id, SandboxSession.version == data.expected_version).values(completed_step_ids=completed_step_ids, responses=data.responses, progress={"completed_step_ids": completed_step_ids, "responses": data.responses, "reflection_answers": answer_data}, version=SandboxSession.version + 1))
+    result = db.execute(update(SandboxSession).where(SandboxSession.id == item.id, SandboxSession.version == data.expected_version).values(completed_step_ids=completed_step_ids, responses=data.responses, progress={"completed_step_ids": completed_step_ids, "responses": data.responses, "reflection_answers": answer_data}, version=SandboxSession.version + 1, updated_at=datetime.now(UTC)))
     if result.rowcount != 1:
         db.rollback()
         raise ApiError(409, "SESSION_VERSION_CONFLICT", "The sandbox session was updated by another request.")
@@ -92,22 +101,32 @@ def update_progress(session_id: uuid.UUID, data: ProgressRequest, db: Annotated[
 
 
 @router.post("/sandbox-sessions/{session_id}/hint", response_model=HintResponse)
-def hint(session_id: uuid.UUID, data: HintRequest, db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)]):
+def hint(session_id: uuid.UUID, data: HintRequest, db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)], _rate_limit: Annotated[None, Depends(rate_limit("hint", 20, 60))] = None):
     item, generated = owned_session(db, session_id, student)
     if item.hints_used >= 3:
         raise ApiError(429, "HINT_LIMIT_REACHED", "No more hints are available for this session.")
     item.hints_used += 1
+    item.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(item)
     return {"hint_level": item.hints_used, "hint": build_progressive_hint(generated.sandbox_spec or {}, item.responses, item.completed_step_ids, item.hints_used, data.current_step_id), "remaining_hint_levels": 3 - item.hints_used}
 
 
+def _submission_payload(submission: Submission) -> dict:
+    return {"id": submission.id, "assignment_id": submission.assignment_id, "student_id": submission.student_id, "status": "submitted", "submitted_at": submission.submitted_at}
+
+
 @router.post("/sandbox-sessions/{session_id}/submit", response_model=SubmissionResponse, status_code=status.HTTP_201_CREATED)
 def submit(session_id: uuid.UUID, data: SubmitRequest, db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)]):
     item, generated = owned_session(db, session_id, student)
-    existing = db.scalar(select(Submission).where(Submission.session_id == item.id))
+    assignment_id = generated.assignment_id
+    # A student may hold more than one session for an assignment (e.g. interests changed
+    # between starts). Idempotency is keyed on (assignment, student) to match the DB
+    # uniqueness — not on session_id — so a second session returns the first submission
+    # instead of colliding on the constraint (H3).
+    existing = db.scalar(select(Submission).where(Submission.assignment_id == assignment_id, Submission.student_id == student.id))
     if existing:
-        return {"id": existing.id, "assignment_id": existing.assignment_id, "student_id": existing.student_id, "status": "submitted", "submitted_at": existing.submitted_at}
+        return _submission_payload(existing)
     if item.version != data.expected_session_version:
         raise ApiError(409, "SESSION_VERSION_CONFLICT", "The sandbox session was updated by another request.")
     spec = generated.sandbox_spec or {}
@@ -121,52 +140,71 @@ def submit(session_id: uuid.UUID, data: SubmitRequest, db: Annotated[Session, De
         raise ApiError(409, "SANDBOX_INCOMPLETE", "Complete the required steps and reflections before submitting.")
     item.completed_step_ids = completed_step_ids
     item.progress = {"completed_step_ids": completed_step_ids, "responses": item.responses, "reflection_answers": answer_data}
-    submission = Submission(assignment_id=generated.assignment_id, generated_assignment_id=generated.id, session_id=item.id, student_id=student.id, responses_snapshot=item.responses, reflection_answers=answer_data)
+    submission = Submission(assignment_id=assignment_id, generated_assignment_id=generated.id, session_id=item.id, student_id=student.id, responses_snapshot=item.responses, reflection_answers=answer_data)
     item.status = SandboxSessionStatus.SUBMITTED
     item.submitted_at = datetime.now(UTC)
+    item.updated_at = datetime.now(UTC)
     db.add(submission)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent submit (same session) or a sibling session for the same assignment
+        # won the race and already recorded the submission — return it idempotently rather
+        # than surfacing a 500 (H3).
+        db.rollback()
+        winner = db.scalar(select(Submission).where(Submission.assignment_id == assignment_id, Submission.student_id == student.id))
+        if winner is None:
+            raise
+        return _submission_payload(winner)
     db.refresh(submission)
-    return {"id": submission.id, "assignment_id": submission.assignment_id, "student_id": submission.student_id, "status": "submitted", "submitted_at": submission.submitted_at}
+    return _submission_payload(submission)
 
 
 @router.get("/assignments/{assignment_id}/submissions", response_model=SubmissionListResponse)
-def submissions(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+def submissions(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)], limit: int = DEFAULT_PAGE_SIZE, offset: int = 0):
+    limit, offset = _page(limit, offset)
     assignment = db.get(Assignment, assignment_id)
     if assignment is None or assignment.teacher_id != teacher.id:
         raise ApiError(404, "ASSIGNMENT_NOT_FOUND", "The requested assignment was not found.")
-    rows = db.execute(select(Submission, Profile).join(Profile, Profile.id == Submission.student_id).where(Submission.assignment_id == assignment_id)).all()
-    return {"items": [{"submission_id": item.id, "student_id": item.student_id, "student_name": profile.display_name, "status": "submitted", "submitted_at": item.submitted_at} for item, profile in rows], "total": len(rows)}
+    total = db.scalar(select(func.count()).select_from(Submission).where(Submission.assignment_id == assignment_id)) or 0
+    rows = db.execute(select(Submission, Profile).join(Profile, Profile.id == Submission.student_id).where(Submission.assignment_id == assignment_id).order_by(Submission.submitted_at.desc()).limit(limit).offset(offset)).all()
+    return {"items": [{"submission_id": item.id, "student_id": item.student_id, "student_name": profile.display_name, "status": "submitted", "submitted_at": item.submitted_at} for item, profile in rows], "total": total}
 
 
 @router.get("/assignments/{assignment_id}/progress", response_model=AssignmentProgressListResponse)
-def assignment_progress(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+def assignment_progress(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)], limit: int = DEFAULT_PAGE_SIZE, offset: int = 0):
+    limit, offset = _page(limit, offset)
     assignment = db.get(Assignment, assignment_id)
     if assignment is None or assignment.teacher_id != teacher.id:
         raise ApiError(404, "ASSIGNMENT_NOT_FOUND", "The requested assignment was not found.")
 
+    total = db.scalar(select(func.count()).select_from(ClassMember).where(ClassMember.class_id == assignment.class_id)) or 0
     members = db.execute(
         select(ClassMember, Profile)
         .join(Profile, Profile.id == ClassMember.student_id)
         .where(ClassMember.class_id == assignment.class_id)
         .order_by(Profile.display_name)
+        .limit(limit)
+        .offset(offset)
     ).all()
+    member_ids = [member.student_id for member, _ in members]
     generated_rows = db.execute(
         select(GeneratedAssignment, SandboxSession)
         .outerjoin(SandboxSession, SandboxSession.generated_assignment_id == GeneratedAssignment.id)
         .where(
             GeneratedAssignment.assignment_id == assignment_id,
             GeneratedAssignment.status == GenerationStatus.COMPLETED,
+            GeneratedAssignment.student_id.in_(member_ids),
         )
         .order_by(GeneratedAssignment.created_at.desc())
-    ).all()
+    ).all() if member_ids else []
     sessions_by_student: dict[uuid.UUID, tuple[GeneratedAssignment, SandboxSession | None]] = {}
     for generated, session in generated_rows:
         sessions_by_student.setdefault(generated.student_id, (generated, session))
     submissions_by_student = {
         item.student_id: item
-        for item in db.scalars(select(Submission).where(Submission.assignment_id == assignment_id)).all()
-    }
+        for item in db.scalars(select(Submission).where(Submission.assignment_id == assignment_id, Submission.student_id.in_(member_ids))).all()
+    } if member_ids else {}
 
     items = []
     for member, profile in members:
@@ -183,4 +221,4 @@ def assignment_progress(assignment_id: uuid.UUID, db: Annotated[Session, Depends
             "hints_used": session.hints_used if session else 0,
             "submitted_at": submission.submitted_at if submission else None,
         })
-    return {"items": items, "total": len(items)}
+    return {"items": items, "total": total}

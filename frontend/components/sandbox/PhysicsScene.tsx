@@ -13,27 +13,38 @@ function easeOutCubic(progress: number): number {
 }
 
 export function PhysicsScene({ spec, values, runToken }: { spec: SandboxSpec; values: Record<string, number>; runToken: number }) {
-  const mass = values.mass ?? 0;
-  const acceleration = values.acceleration ?? 0;
   const maxMass = spec.variables.find((variable) => variable.id === "mass")?.max ?? 1;
   const maxAcceleration = spec.variables.find((variable) => variable.id === "acceleration")?.max ?? 1;
-  const force = calculateFormula(spec.formula_id, values);
   const maxForce = maxMass * maxAcceleration || 1;
-  const targetPosition = getPosition(acceleration, maxAcceleration);
   const initialPosition = 80;
+  // The readout (numbers, arrow, and object position) reflects the last *run*
+  // rather than live slider values, so the whole visualization always describes
+  // one internally consistent executed experiment instead of a half-updated one.
+  const [runValues, setRunValues] = useState(values);
   const [objectPosition, setObjectPosition] = useState(initialPosition);
   const [isRunning, setIsRunning] = useState(false);
   const positionRef = useRef(initialPosition);
   const animationFrameRef = useRef<number | undefined>(undefined);
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
   const theme = spec.visual_theme ?? "basketball";
   const objectLabel = useMemo(() => ({ basketball: "Basketball", formula1: "F1 car", space: "Rocket" }[theme]), [theme]);
 
+  const mass = runValues.mass ?? 0;
+  const acceleration = runValues.acceleration ?? 0;
+  const force = calculateFormula(spec.formula_id, runValues);
+
   useEffect(() => {
     if (runToken === 0) return;
+    // Snapshot the live values as the executed experiment. `values` is read via
+    // closure intentionally (deps are [runToken]); a run only fires on click.
+    const snapshot = valuesRef.current;
+    setRunValues(snapshot);
+    const runTarget = getPosition(snapshot.acceleration ?? 0, maxAcceleration);
 
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      positionRef.current = targetPosition;
-      setObjectPosition(targetPosition);
+      positionRef.current = runTarget;
+      setObjectPosition(runTarget);
       setIsRunning(false);
       return;
     }
@@ -45,7 +56,7 @@ export function PhysicsScene({ spec, values, runToken }: { spec: SandboxSpec; va
 
     function animate(currentTime: number) {
       const progress = Math.min(1, (currentTime - startTime) / ANIMATION_DURATION_MS);
-      const nextPosition = startPosition + (targetPosition - startPosition) * easeOutCubic(progress);
+      const nextPosition = startPosition + (runTarget - startPosition) * easeOutCubic(progress);
       positionRef.current = nextPosition;
       setObjectPosition(nextPosition);
 

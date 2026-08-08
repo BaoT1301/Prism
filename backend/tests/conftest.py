@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from app.api.dependencies.auth import get_token_verifier
+from app.api.dependencies.rate_limit import limiter
 from app.core.errors import ApiError
 from app.db.session import get_db
 from app.main import create_app
@@ -35,6 +36,7 @@ def subject() -> str:
 
 @pytest.fixture
 def client(subject: str):
+    limiter.reset()  # isolate the process-wide in-memory rate limiter between tests
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)
     session_factory = sessionmaker(bind=engine, expire_on_commit=False)

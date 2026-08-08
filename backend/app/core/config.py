@@ -9,6 +9,12 @@ class Settings(BaseSettings):
     environment: str = "development"
     log_level: str = "INFO"
     database_url: str = "postgresql+psycopg://postgres:postgres@localhost:5432/personalized_learning"
+    # Connection-pool tuning (M9). Sized for a single web worker in front of the
+    # Supabase pooler; raise pool_size/max_overflow if you run more workers.
+    db_pool_size: int = 10
+    db_max_overflow: int = 20
+    db_pool_timeout: int = 30
+    db_pool_recycle: int = 1800
     clerk_jwks_url: str | None = None
     clerk_issuer: str | None = None
     clerk_authorized_parties: str = ""

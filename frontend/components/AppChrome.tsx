@@ -13,6 +13,18 @@ export function PrismBrand({ compact = false }: { compact?: boolean }) {
   );
 }
 
+export function SessionExpired({ onSignOut }: { onSignOut: () => Promise<unknown> }) {
+  return (
+    <main className="system-message" role="alert" data-testid="session-expired">
+      <PrismBrand />
+      <p className="eyebrow">Session expired</p>
+      <h1>Please sign in again.</h1>
+      <p>Your secure session has ended. Sign in to pick up right where you left off.</p>
+      <button type="button" onClick={() => void onSignOut()}>Sign in again</button>
+    </main>
+  );
+}
+
 export function AppShell({
   role,
   name,

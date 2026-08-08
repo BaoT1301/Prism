@@ -1,7 +1,52 @@
 import type { ReflectionAnswer, ReflectionQuestion } from "../../features/sandbox/sandbox-types";
 
 const choices = ["Force increases", "Force decreases", "Force stays the same"];
+const choicePrefix = /^(Force increases|Force decreases|Force stays the same)\.\s*/;
 
 export function ReflectionForm({ questions, answers, onChange }: { questions: ReflectionQuestion[]; answers: ReflectionAnswer[]; onChange: (answers: ReflectionAnswer[]) => void }) {
-  return <section className="reflection-card"><p className="card-kicker">Make your discovery</p><h2>Reflection</h2>{questions.map((question) => { const current = answers.find((answer) => answer.question_id === question.id)?.answer ?? ""; const selected = choices.find((choice) => current.startsWith(choice)); const explanation = current.replace(/^(Force increases|Force decreases|Force stays the same)\.\s*/, ""); return <div className="reflection-question" key={question.id}><h3>{question.question}</h3><div className="answer-choices" role="radiogroup" aria-label="Reflection answer">{choices.map((choice) => <label className={selected === choice ? "selected" : ""} key={choice}><input type="radio" name={question.id} checked={selected === choice} onChange={() => onChange([...answers.filter((answer) => answer.question_id !== question.id), { question_id: question.id, answer: `${choice}.` }])} />{choice}</label>)}</div><label className="explanation-label">Explain your thinking<textarea placeholder="Add a short explanation..." value={explanation} onChange={(event) => onChange([...answers.filter((answer) => answer.question_id !== question.id), { question_id: question.id, answer: `${selected ? `${selected}. ` : ""}${event.target.value}` }])} /></label></div>; })}</section>;
+  const setAnswer = (questionId: string, answer: string) => onChange([...answers.filter((item) => item.question_id !== questionId), { question_id: questionId, answer }]);
+
+  return (
+    <section className="reflection-card">
+      <p className="card-kicker">Make your discovery</p>
+      <h2>Reflection</h2>
+      {questions.map((question) => {
+        const current = answers.find((answer) => answer.question_id === question.id)?.answer ?? "";
+        const selected = choices.find((choice) => current.startsWith(choice));
+        const explanation = current.replace(choicePrefix, "");
+        const headingId = `reflection-question-${question.id}`;
+        // Re-compose the stored answer as "<choice>. <explanation>", preserving
+        // whichever side was not just edited so switching a choice never wipes text.
+        const compose = (choice: string | undefined, text: string) => `${choice ? `${choice}.` : ""}${choice && text ? " " : ""}${text}`;
+        return (
+          <div className="reflection-question" key={question.id}>
+            <h3 id={headingId}>{question.question}</h3>
+            <div className="answer-choices" role="radiogroup" aria-labelledby={headingId}>
+              {choices.map((choice, index) => (
+                <label className={selected === choice ? "selected" : ""} key={choice}>
+                  <input
+                    type="radio"
+                    name={question.id}
+                    checked={selected === choice}
+                    data-testid={`reflection-${question.id}-choice-${index}`}
+                    onChange={() => setAnswer(question.id, compose(choice, explanation))}
+                  />
+                  {choice}
+                </label>
+              ))}
+            </div>
+            <label className="explanation-label">
+              Explain your thinking
+              <textarea
+                placeholder="Add a short explanation..."
+                value={explanation}
+                data-testid={`reflection-${question.id}-explanation`}
+                onChange={(event) => setAnswer(question.id, compose(selected, event.target.value))}
+              />
+            </label>
+          </div>
+        );
+      })}
+    </section>
+  );
 }

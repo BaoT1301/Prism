@@ -19,7 +19,7 @@ export function CompletionScreen({
   }).format(new Date(submittedAt));
 
   return (
-    <main className="completion-screen">
+    <main className="completion-screen" data-testid="completion-screen">
       <section className="completion-card">
         <div className="completion-orbit" aria-hidden="true"><span /><span /><i>✦</i></div>
         <p className="eyebrow">Mission complete</p>

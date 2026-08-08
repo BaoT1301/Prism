@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { PrismBrand } from "../../components/AppChrome";
 import { CompletionScreen } from "../../components/sandbox/CompletionScreen";
@@ -8,11 +8,15 @@ import { PhysicsScene } from "../../components/sandbox/PhysicsScene";
 import { ReflectionForm } from "../../components/sandbox/ReflectionForm";
 import { SaveStatus } from "../../components/sandbox/SaveStatus";
 import { VariableSlider } from "../../components/sandbox/VariableSlider";
-import { SandboxApiError, type SandboxApi } from "../../lib/sandbox/sandbox-api";
+import { toFiniteNumber } from "../../lib/guards";
+import type { SandboxApi } from "../../lib/sandbox/sandbox-api";
 import { mergeCompletedStepIds } from "./completion";
 import { calculateFormula } from "./formula-registry";
 import { buildProgressRequest, progressPercentage } from "./progress";
+import { createSerialRunner, isConflictError, type LocalEdits, rebaseOntoServer, sanitizeSession } from "./session-sync";
 import type { HintResponse, ReflectionAnswer, SandboxSession, SandboxSpec } from "./sandbox-types";
+
+const AUTOSAVE_DELAY_MS = 400;
 
 export function ParameterExplorer({
   spec,
@@ -25,24 +29,34 @@ export function ParameterExplorer({
   api: SandboxApi;
   onExit?: () => void;
 }) {
-  const initialValues = Object.fromEntries(spec.variables.map((variable) => [variable.id, initialSession.responses[variable.id] ?? variable.default]));
+  const startSession = useMemo(() => sanitizeSession(initialSession), [initialSession]);
+  // Coerce persisted responses to finite numbers so a malformed payload can never
+  // reach calculateFormula and throw during render.
+  const initialValues = useMemo(
+    () => Object.fromEntries(spec.variables.map((variable) => [variable.id, toFiniteNumber(startSession.responses[variable.id], variable.default)])),
+    [spec, startSession],
+  );
   const [values, setValues] = useState<Record<string, number>>(initialValues);
-  const [completedStepIds, setCompletedStepIds] = useState(initialSession.completed_step_ids);
-  const [session, setSession] = useState(initialSession);
+  const [completedStepIds, setCompletedStepIds] = useState(startSession.completed_step_ids);
+  const [session, setSession] = useState(startSession);
   const [saveStatus, setSaveStatus] = useState<Parameters<typeof SaveStatus>[0]["status"]>("idle");
   const [hint, setHint] = useState<HintResponse>();
   const [hintError, setHintError] = useState<string>();
-  const [reflectionAnswers, setReflectionAnswers] = useState<ReflectionAnswer[]>(initialSession.reflection_answers);
+  const [reflectionAnswers, setReflectionAnswers] = useState<ReflectionAnswer[]>(startSession.reflection_answers);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string>();
   const [submittedAt, setSubmittedAt] = useState<string | undefined>(
-    initialSession.status === "submitted" ? initialSession.submitted_at : undefined,
+    startSession.status === "submitted" ? startSession.submitted_at : undefined,
   );
   const [runToken, setRunToken] = useState(0);
   const firstRender = useRef(true);
-  const sessionRef = useRef(initialSession);
-  const saveGenerationRef = useRef(0);
-  sessionRef.current = session;
+  const debounceRef = useRef<number | undefined>(undefined);
+  // Authoritative view of the persisted session (version source of truth).
+  const sessionRef = useRef<SandboxSession>(startSession);
+  // Always-current local edits so a serialized save reads the latest snapshot.
+  const latestRef = useRef<LocalEdits>({ completedStepIds, responses: values, reflectionAnswers });
+  latestRef.current = { completedStepIds, responses: values, reflectionAnswers };
+
   const result = useMemo(() => calculateFormula(spec.formula_id, values), [spec.formula_id, values]);
   const automaticIds = useMemo(() => spec.guided_steps.filter((step) => (step.completion_checks?.length ?? 0) > 0).map((step) => step.id), [spec]);
   const percentage = progressPercentage(spec.guided_steps, completedStepIds);
@@ -55,28 +69,52 @@ export function ParameterExplorer({
     });
   }, [reflectionAnswers, spec, values]);
 
-  useEffect(() => {
-    if (firstRender.current) { firstRender.current = false; return; }
-    const generation = ++saveGenerationRef.current;
-    const timer = window.setTimeout(async () => {
-      setSaveStatus("saving");
-      const requestSession = sessionRef.current;
-      try {
-        const latest = await api.updateProgress(requestSession.id, buildProgressRequest(requestSession, completedStepIds, values, reflectionAnswers));
-        sessionRef.current = { ...sessionRef.current, ...latest };
-        setSession((current) => ({ ...current, ...latest }));
-        if (generation === saveGenerationRef.current) setSaveStatus("saved");
-      } catch (error) {
-        if (error instanceof SandboxApiError && error.status === 409) {
-          const latest = await api.getSession(requestSession.id);
-          sessionRef.current = latest;
-          setSession((current) => ({ ...current, ...latest }));
-          if (generation === saveGenerationRef.current) setSaveStatus("conflict");
-        } else if (generation === saveGenerationRef.current) setSaveStatus("error");
+  // Persist the latest snapshot exactly once, reconciling version conflicts.
+  const saveTask = useCallback(async () => {
+    const snapshot = latestRef.current;
+    setSaveStatus("saving");
+    const request = buildProgressRequest(sessionRef.current, snapshot.completedStepIds, snapshot.responses, snapshot.reflectionAnswers);
+    try {
+      const latest = await api.updateProgress(sessionRef.current.id, request);
+      sessionRef.current = { ...sessionRef.current, ...latest };
+      setSession((current) => ({ ...current, ...latest }));
+      setSaveStatus("saved");
+    } catch (error) {
+      if (!isConflictError(error)) {
+        setSaveStatus("error");
+        return;
       }
-    }, 400);
-    return () => window.clearTimeout(timer);
-  }, [api, completedStepIds, reflectionAnswers, values]);
+      // Rebase local edits onto the server's authoritative session, then queue
+      // one more save so the merged result is pushed with the fresh version.
+      const server = await api.getSession(sessionRef.current.id);
+      const rebased = rebaseOntoServer(server, latestRef.current);
+      sessionRef.current = rebased;
+      setSession(rebased);
+      setCompletedStepIds(rebased.completed_step_ids);
+      setSaveStatus("conflict");
+      saveRunnerRef.current.schedulePending();
+    }
+  }, [api]);
+
+  const saveTaskRef = useRef(saveTask);
+  saveTaskRef.current = saveTask;
+  const saveRunnerRef = useRef(createSerialRunner(() => saveTaskRef.current()));
+
+  useEffect(() => {
+    if (firstRender.current) {
+      firstRender.current = false;
+      return;
+    }
+    window.clearTimeout(debounceRef.current);
+    debounceRef.current = window.setTimeout(() => void saveRunnerRef.current.run(), AUTOSAVE_DELAY_MS);
+    return () => window.clearTimeout(debounceRef.current);
+  }, [completedStepIds, reflectionAnswers, values]);
+
+  const flushSave = useCallback(async () => {
+    window.clearTimeout(debounceRef.current);
+    await saveRunnerRef.current.run();
+    await saveRunnerRef.current.settled();
+  }, []);
 
   async function requestHint() {
     setHintError(undefined);
@@ -93,9 +131,25 @@ export function ParameterExplorer({
     setSubmitting(true);
     setSubmitError(undefined);
     try {
-      const submission = await api.submit(session.id, session.version, reflectionAnswers);
-      setSession((current) => ({ ...current, status: "submitted", submitted_at: submission.submitted_at }));
-      setSubmittedAt(submission.submitted_at);
+      // Make sure the latest progress (and version) is persisted before submitting.
+      await flushSave();
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const submission = await api.submit(sessionRef.current.id, sessionRef.current.version, latestRef.current.reflectionAnswers);
+          sessionRef.current = { ...sessionRef.current, status: "submitted", submitted_at: submission.submitted_at };
+          setSession((current) => ({ ...current, status: "submitted", submitted_at: submission.submitted_at }));
+          setSubmittedAt(submission.submitted_at);
+          return;
+        } catch (error) {
+          // A concurrent save can bump the version between flush and submit; re-sync once and retry.
+          if (isConflictError(error) && attempt === 0) {
+            const server = await api.getSession(sessionRef.current.id);
+            sessionRef.current = { ...sessionRef.current, version: server.version };
+            continue;
+          }
+          throw error;
+        }
+      }
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : "Unable to complete this mission.");
     } finally {
@@ -108,7 +162,7 @@ export function ParameterExplorer({
   }
 
   return (
-    <div className={`sandbox-app theme-${spec.visual_theme ?? "basketball"}`}>
+    <div className={`sandbox-app theme-${spec.visual_theme ?? "basketball"}`} data-testid="sandbox-app">
       <header className="lab-topbar">
         <PrismBrand />
         <div><span className="lab-chip"><i aria-hidden="true" /> Interactive lab</span>{onExit && <button className="text-button" type="button" onClick={onExit}>Exit assignment</button>}</div>
@@ -122,7 +176,7 @@ export function ParameterExplorer({
         <div className="sandbox-dashboard">
           <div className="simulation-column">
             <PhysicsScene spec={spec} values={values} runToken={runToken} />
-            <div className="simulation-action"><div><p className="card-kicker">Ready when you are</p><strong>Change a variable, then run the experiment.</strong></div><button className="primary-button" type="button" onClick={() => setRunToken((token) => token + 1)}>Run experiment <span aria-hidden="true">→</span></button></div>
+            <div className="simulation-action"><div><p className="card-kicker">Ready when you are</p><strong>Change a variable, then run the experiment.</strong></div><button className="primary-button" type="button" data-testid="run-experiment" onClick={() => setRunToken((token) => token + 1)}>Run experiment <span aria-hidden="true">→</span></button></div>
           </div>
           <aside className="coach-column">
             <HintPanel hint={hint} remaining={hint?.remaining_hint_levels ?? Math.max(0, 3 - session.hints_used)} onRequest={requestHint} />
@@ -147,7 +201,7 @@ export function ParameterExplorer({
         {submitError && <p className="notice" role="alert">{submitError}</p>}
         <div className="completion-bar">
           <SaveStatus status={saveStatus} />
-          <div><p>{missionComplete ? "Every experiment step is complete." : "Finish the checklist and reflection to complete the mission."}</p><button className="complete-button" type="button" disabled={submitting || session.status === "submitted" || !missionComplete} onClick={() => void submit()}>{session.status === "submitted" ? "Mission complete" : submitting ? "Saving mission..." : "Complete mission →"}</button></div>
+          <div><p>{missionComplete ? "Every experiment step is complete." : "Finish the checklist and reflection to complete the mission."}</p><button className="complete-button" type="button" data-testid="complete-mission" disabled={submitting || session.status === "submitted" || !missionComplete} onClick={() => void submit()}>{session.status === "submitted" ? "Mission complete" : submitting ? "Saving mission..." : "Complete mission →"}</button></div>
         </div>
       </main>
     </div>

@@ -2,7 +2,7 @@
 
 from sqlalchemy import select
 
-from app.db.session import SessionLocal
+from app.db.session import get_sessionmaker
 from app.models.models import Assignment, AssignmentStatus, Class, ClassMember, InterestProfile, Profile, UserRole
 
 
@@ -16,7 +16,7 @@ def profile(db, email: str, name: str, role: UserRole) -> Profile:
 
 
 def main() -> None:
-    with SessionLocal() as db:
+    with get_sessionmaker()() as db:
         teacher = profile(db, "teacher.demo@example.test", "Ms. Rivera", UserRole.TEACHER)
         students = [
             profile(db, "basketball.demo@example.test", "Jordan", UserRole.STUDENT),

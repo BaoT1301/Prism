@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import basketball from "../features/sandbox/fixtures/basketball.json";
 import { validateSandboxSpec } from "../features/sandbox/sandbox-validation";
-import { createDemoSandboxApi } from "./demo-api";
+import { createDemoSandboxApi, demoStorageKey } from "./demo-api";
 
 function memoryStorage(): Storage {
   const values = new Map<string, string>();
@@ -16,13 +16,30 @@ function memoryStorage(): Storage {
 }
 
 describe("local sandbox demo API", () => {
-  it("starts a new demo session without stale completion state", async () => {
+  const spec = validateSandboxSpec(basketball);
+
+  it("ignores state stored under a previous storage version", async () => {
     const storage = memoryStorage();
-    storage.setItem("prism-sandbox-demo:Basketball Force Lab", JSON.stringify({
+    // Seed under the *legacy* key; the current version must not read it.
+    storage.setItem(demoStorageKey(spec, "v1"), JSON.stringify({
       session: { id: "old", version: 9, status: "in_progress", completed_step_ids: ["step-1", "step-2", "step-3"], responses: {}, reflection_answers: [], hints_used: 0 },
     }));
-    const launch = await createDemoSandboxApi(validateSandboxSpec(basketball), storage).launchAssignment("demo-assignment");
+    const launch = await createDemoSandboxApi(spec, storage).launchAssignment("demo-assignment");
     expect(launch.session.completed_step_ids).toEqual([]);
+    expect(launch.session.version).toBe(1);
+  });
+
+  it("resumes progress stored under the current key", async () => {
+    const storage = memoryStorage();
+    // Seed under the *current* key (via the real builder) so it must collide.
+    storage.setItem(demoStorageKey(spec), JSON.stringify({
+      session: { id: "resume", version: 4, status: "in_progress", completed_step_ids: ["step-1"], responses: { mass: 0.7, acceleration: 8 }, reflection_answers: [], hints_used: 1 },
+    }));
+    const launch = await createDemoSandboxApi(spec, storage).launchAssignment("demo-assignment");
+    expect(launch.session.id).toBe("resume");
+    expect(launch.session.version).toBe(4);
+    expect(launch.session.completed_step_ids).toEqual(["step-1"]);
+    expect(launch.cache_status).toBe("hit");
   });
 
   it("persists progress and returns three different progressive hints", async () => {

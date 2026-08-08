@@ -1,13 +1,11 @@
-import { type FormEvent, type ReactNode, useEffect, useState } from "react";
+import { type FormEvent, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import { SignIn, useAuth } from "@clerk/react";
 
-import { PrismBrand } from "../components/AppChrome";
+import { PrismBrand, SessionExpired } from "../components/AppChrome";
 import { LandingPage } from "../components/LandingPage";
 import { StudentApp } from "../features/student/StudentApp";
 import { TeacherApp } from "../features/teacher/TeacherApp";
-import { apiRequest } from "../lib/api-client";
-
-type AccessTokenProvider = () => Promise<string | null>;
+import { apiRequest, ApiError, isAbortError, type AccessTokenProvider } from "../lib/api-client";
 
 function AuthLayout({ children, eyebrow = "Learning, made personal" }: { children: ReactNode; eyebrow?: string }) {
   return (
@@ -39,6 +37,11 @@ function AuthLayout({ children, eyebrow = "Learning, made personal" }: { childre
 
 export function AuthApp() {
   const { getToken, isLoaded, isSignedIn, signOut } = useAuth();
+  // Keep a stable token accessor so downstream memos/effects keyed on it do not
+  // re-run (and refetch) every time Clerk hands back a new getToken identity.
+  const getTokenRef = useRef(getToken);
+  getTokenRef.current = getToken;
+  const getAccessToken = useCallback<AccessTokenProvider>(() => getTokenRef.current(), []);
   const [route, setRoute] = useState(() => location.hash);
 
   useEffect(() => {
@@ -84,24 +87,31 @@ export function AuthApp() {
     );
   }
 
-  return <Workspace getAccessToken={getToken} onSignOut={signOut} />;
+  return <Workspace getAccessToken={getAccessToken} onSignOut={signOut} />;
 }
 
 function Workspace({ getAccessToken, onSignOut }: { getAccessToken: AccessTokenProvider; onSignOut: () => Promise<void> }) {
   const [profile, setProfile] = useState<{ role: "teacher" | "student" }>();
   const [missing, setMissing] = useState(false);
   const [error, setError] = useState<string>();
+  const [authExpired, setAuthExpired] = useState(false);
   const [bootstrapError, setBootstrapError] = useState<string>();
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    void apiRequest<{ role: "teacher" | "student" }>("/api/v1/me", {}, getAccessToken)
-      .then(setProfile)
-      .catch((reason: Error & { code?: string }) => {
-        if (reason.code === "PROFILE_NOT_PROVISIONED") setMissing(true);
-        else setError(reason.message);
+    const controller = new AbortController();
+    void apiRequest<{ role: "teacher" | "student" }>("/api/v1/me", { signal: controller.signal }, getAccessToken)
+      .then((data) => { if (!controller.signal.aborted) setProfile(data); })
+      .catch((reason: unknown) => {
+        if (isAbortError(reason)) return;
+        if (reason instanceof ApiError && reason.isAuthError) { setAuthExpired(true); return; }
+        if (reason instanceof ApiError && reason.code === "PROFILE_NOT_PROVISIONED") setMissing(true);
+        else setError(reason instanceof Error ? reason.message : "We could not open your profile.");
       });
+    return () => controller.abort();
   }, [getAccessToken]);
+
+  if (authExpired) return <SessionExpired onSignOut={onSignOut} />;
 
   if (error) {
     return (
@@ -129,7 +139,10 @@ function Workspace({ getAccessToken, onSignOut }: { getAccessToken: AccessTokenP
           void apiRequest("/api/v1/profiles/bootstrap", {
             method: "POST",
             body: JSON.stringify({ display_name: String(form.get("name")), role: String(form.get("role")) }),
-          }, getAccessToken).then(() => location.reload()).catch((reason: Error) => setBootstrapError(reason.message)).finally(() => setSaving(false));
+          }, getAccessToken).then(() => location.reload()).catch((reason: unknown) => {
+            if (reason instanceof ApiError && reason.isAuthError) { setAuthExpired(true); return; }
+            setBootstrapError(reason instanceof Error ? reason.message : "We could not create your space.");
+          }).finally(() => setSaving(false));
         }}>
           <label className="field"><span>What should we call you?</span><input name="name" autoComplete="name" placeholder="Your display name" required /></label>
           <fieldset className="role-picker">

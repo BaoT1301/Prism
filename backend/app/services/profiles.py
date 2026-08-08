@@ -10,6 +10,10 @@ from app.services.jwt import AuthClaims
 
 
 class ProfileService:
+    # TODO (M7, deferred): add a GDPR soft-delete + anonymize path. Every FK into `profiles`
+    # is ondelete=RESTRICT, so account erasure needs a dedicated flow: mark the profile
+    # deleted, scrub PII (email/display_name), and have require_profile reject deleted
+    # profiles. Deferred from the hardening pass because it touches the authentication path.
     def get_by_auth_id(self, db: Session, auth_user_id) -> Profile | None:
         return db.scalar(select(Profile).where(Profile.auth_user_id == auth_user_id))
 

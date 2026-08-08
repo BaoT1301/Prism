@@ -1,7 +1,9 @@
 import { type FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 
-import { AppShell } from "../../components/AppChrome";
-import { apiRequest, resolveApiBaseUrl, type AccessTokenProvider } from "../../lib/api-client";
+import { AppShell, SessionExpired } from "../../components/AppChrome";
+import { AsyncState, Skeleton } from "../../components/AsyncState";
+import { apiRequest, ApiError, isAbortError, type AccessTokenProvider } from "../../lib/api-client";
+import { ensureItems } from "../../lib/guards";
 import { createSandboxApi } from "../../lib/sandbox/sandbox-api";
 import { SandboxRenderer } from "../sandbox/SandboxRenderer";
 import type { SandboxLaunch } from "../sandbox/sandbox-types";
@@ -34,6 +36,7 @@ const interestFields: { key: InterestKey; label: string; placeholder: string }[]
 
 const splitList = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
 const normalizeInterests = (value: Interests) => Object.fromEntries(interestFields.map(({ key }) => [key, value[key] ?? []])) as Interests;
+const seedDrafts = (value: Interests): InterestDrafts => Object.fromEntries(interestFields.map(({ key }) => [key, value[key].join(", ")])) as InterestDrafts;
 
 export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: AccessTokenProvider; onSignOut: () => Promise<unknown> }) {
   const [classes, setClasses] = useState<ClassItem[]>([]);
@@ -43,36 +46,67 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [launch, setLaunch] = useState<SandboxLaunch>();
   const [error, setError] = useState<string>();
+  const [authExpired, setAuthExpired] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
   const [savingInterests, setSavingInterests] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
   const [launchingId, setLaunchingId] = useState<string>();
-  const apiBaseUrl = resolveApiBaseUrl();
-  const sandboxApi = useMemo(() => createSandboxApi(apiBaseUrl, getAccessToken), [apiBaseUrl, getAccessToken]);
+  const sandboxApi = useMemo(() => createSandboxApi(getAccessToken), [getAccessToken]);
 
-  const load = useCallback(() => {
+  const handleFailure = useCallback((reason: unknown) => {
+    if (isAbortError(reason)) return; // superseded/cancelled request
+    if (reason instanceof ApiError && reason.isAuthError) { setAuthExpired(true); return; }
+    setError(reason instanceof Error ? reason.message : "Something went wrong.");
+  }, []);
+
+  // Refresh only the class list (used after joining) so unsaved interest drafts survive.
+  const loadClasses = useCallback(async () => {
+    try {
+      const data = await apiRequest<{ items: ClassItem[] }>("/api/v1/classes", {}, getAccessToken);
+      setClasses(ensureItems(data));
+    } catch (reason) {
+      handleFailure(reason);
+    }
+  }, [getAccessToken, handleFailure]);
+
+  // Initial load: classes + interests, seeding interest drafts exactly once.
+  useEffect(() => {
+    const controller = new AbortController();
+    setLoading(true);
     setError(undefined);
     void Promise.all([
-      apiRequest<{ items: ClassItem[] }>("/api/v1/classes", {}, getAccessToken),
-      apiRequest<Interests>("/api/v1/me/interests", {}, getAccessToken).catch(() => emptyInterests),
+      apiRequest<{ items: ClassItem[] }>("/api/v1/classes", { signal: controller.signal }, getAccessToken),
+      apiRequest<Interests>("/api/v1/me/interests", { signal: controller.signal }, getAccessToken).catch((reason) => {
+        if (isAbortError(reason)) throw reason; // propagate cancellation
+        return emptyInterests; // interests are optional; a failure should not block classes
+      }),
     ]).then(([classData, saved]) => {
       const normalized = normalizeInterests(saved);
-      setClasses(classData.items);
+      setClasses(ensureItems(classData));
       setInterests(normalized);
-      setInterestDrafts(Object.fromEntries(interestFields.map(({ key }) => [key, normalized[key].join(", ")])) as InterestDrafts);
-    }).catch((reason: Error) => setError(reason.message));
-  }, [getAccessToken]);
-
-  useEffect(load, [load]);
+      setInterestDrafts(seedDrafts(normalized));
+    }).catch(handleFailure).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
+    });
+    return () => controller.abort();
+  }, [getAccessToken, handleFailure]);
 
   useEffect(() => {
-    if (!selected) return;
+    if (!selected) { setAssignments([]); return; }
+    const controller = new AbortController();
+    setAssignmentsLoading(true);
     setError(undefined);
-    void apiRequest<{ items: Assignment[] }>(`/api/v1/classes/${selected}/assignments`, {}, getAccessToken)
-      .then((data) => setAssignments(data.items))
-      .catch((reason: Error) => setError(reason.message));
-  }, [getAccessToken, selected]);
+    void apiRequest<{ items: Assignment[] }>(`/api/v1/classes/${selected}/assignments`, { signal: controller.signal }, getAccessToken)
+      .then((data) => setAssignments(ensureItems(data)))
+      .catch(handleFailure)
+      .finally(() => { if (!controller.signal.aborted) setAssignmentsLoading(false); });
+    return () => controller.abort();
+  }, [getAccessToken, selected, handleFailure]);
+
+  if (authExpired) return <SessionExpired onSignOut={onSignOut} />;
 
   if (launch) {
     return (
@@ -131,8 +165,8 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
               body: JSON.stringify({ join_code: joinCode }),
             }, getAccessToken).then(() => {
               setJoinCode("");
-              load();
-            }).catch((reason: Error) => setError(reason.message)).finally(() => setJoining(false));
+              void loadClasses();
+            }).catch(handleFailure).finally(() => setJoining(false));
           }}>
             <label className="field"><span>Class code</span><input value={joinCode} onChange={(event) => setJoinCode(event.target.value.toUpperCase())} placeholder="E.G. F7K29Q" maxLength={12} required /></label>
             <button disabled={joining}>{joining ? "Joining..." : "Join class"}</button>
@@ -158,9 +192,9 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
             }, getAccessToken).then((saved) => {
               const normalized = normalizeInterests(saved);
               setInterests(normalized);
-              setInterestDrafts(Object.fromEntries(interestFields.map(({ key }) => [key, normalized[key].join(", ")])) as InterestDrafts);
+              setInterestDrafts(seedDrafts(normalized));
               setInterestsSaved(true);
-            }).catch((reason: Error) => setError(reason.message)).finally(() => setSavingInterests(false));
+            }).catch(handleFailure).finally(() => setSavingInterests(false));
           }}>
             <div className="interest-grid">
               {interestFields.map((field) => (
@@ -187,7 +221,12 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
           <div><p className="eyebrow">Your spaces</p><h2>Classes</h2></div>
           <p>Choose a class to see what is ready for you.</p>
         </div>
-        {classes.length ? (
+        <AsyncState
+          loading={loading}
+          isEmpty={!classes.length}
+          skeleton={<Skeleton rows={3} className="class-skeleton" />}
+          empty={<div className="empty-state"><span aria-hidden="true">01</span><div><h3>Your first class will appear here.</h3><p>Ask your teacher for a class code, then use the join panel above.</p></div></div>}
+        >
           <div className="class-grid">
             {classes.map((item, index) => (
               <article className={`class-card ${selected === item.id ? "is-selected" : ""}`} key={item.id}>
@@ -201,9 +240,7 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
               </article>
             ))}
           </div>
-        ) : (
-          <div className="empty-state"><span aria-hidden="true">01</span><div><h3>Your first class will appear here.</h3><p>Ask your teacher for a class code, then use the join panel above.</p></div></div>
-        )}
+        </AsyncState>
       </section>
 
       {selected && (
@@ -212,7 +249,12 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
             <div><p className="eyebrow">Now learning</p><h2>{selectedClass?.name ?? "Published assignments"}</h2></div>
             <button className="text-button" type="button" onClick={() => setSelected(undefined)}>Close</button>
           </div>
-          {assignments.length ? (
+          <AsyncState
+            loading={assignmentsLoading}
+            isEmpty={!assignments.length}
+            skeleton={<Skeleton rows={2} className="assignment-skeleton" />}
+            empty={<div className="empty-state"><span aria-hidden="true">—</span><div><h3>No published assignments yet.</h3><p>When your teacher publishes one, it will be ready here.</p></div></div>}
+          >
             <div className="assignment-list">
               {assignments.map((assignment) => (
                 <article className="assignment-row" key={assignment.id}>
@@ -222,12 +264,12 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
                   <button type="button" disabled={launchingId === assignment.id} onClick={() => {
                     setError(undefined);
                     setLaunchingId(assignment.id);
-                    void sandboxApi.launchAssignment(assignment.id).then(setLaunch).catch((reason: Error) => setError(reason.message)).finally(() => setLaunchingId(undefined));
+                    void sandboxApi.launchAssignment(assignment.id).then(setLaunch).catch(handleFailure).finally(() => setLaunchingId(undefined));
                   }}>{launchingId === assignment.id ? "Personalizing..." : "Start assignment"}</button>
                 </article>
               ))}
             </div>
-          ) : <div className="empty-state"><span aria-hidden="true">—</span><div><h3>No published assignments yet.</h3><p>When your teacher publishes one, it will be ready here.</p></div></div>}
+          </AsyncState>
         </section>
       )}
     </AppShell>

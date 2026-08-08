@@ -1,7 +1,8 @@
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { AppShell, PrismBrand } from "../../components/AppChrome";
-import type { AccessTokenProvider, ApiError } from "../../lib/api-client";
+import { AppShell, PrismBrand, SessionExpired } from "../../components/AppChrome";
+import { AsyncState, Empty, Loading, Notice } from "../../components/AsyncState";
+import { ApiError, isAbortError, type AccessTokenProvider } from "../../lib/api-client";
 import { createTeacherApi, type Assignment, type AssignmentInput, type ClassInput } from "./teacher-api";
 
 type TeacherApi = ReturnType<typeof createTeacherApi>;
@@ -32,27 +33,23 @@ function useResource<T>(load: () => Promise<T>, key: string) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<string>();
   const [loading, setLoading] = useState(true);
+  const [authExpired, setAuthExpired] = useState(false);
   const loadRef = useRef(load);
   loadRef.current = load;
   const reload = useCallback(() => {
     setLoading(true);
     setError(undefined);
-    void loadRef.current().then(setData).catch((reason) => setError(message(reason))).finally(() => setLoading(false));
+    void loadRef.current()
+      .then(setData)
+      .catch((reason) => {
+        if (isAbortError(reason)) return;
+        if (reason instanceof ApiError && reason.isAuthError) { setAuthExpired(true); return; }
+        setError(message(reason));
+      })
+      .finally(() => setLoading(false));
   }, [key]);
   useEffect(reload, [reload]);
-  return { data, error, loading, reload };
-}
-
-function Notice({ error }: { error?: string }) {
-  return error ? <p className="notice" role="alert">{error}</p> : null;
-}
-
-function Loading({ label = "Loading your workspace..." }: { label?: string }) {
-  return <div className="content-loading" role="status"><span aria-hidden="true" /><p>{label}</p></div>;
-}
-
-function Empty({ title, children }: { title: string; children: ReactNode }) {
-  return <div className="empty-state"><span aria-hidden="true">—</span><div><h3>{title}</h3><p>{children}</p></div></div>;
+  return { data, error, loading, authExpired, reload };
 }
 
 function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
@@ -102,6 +99,7 @@ export function TeacherApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
     return () => removeEventListener("hashchange", update);
   }, []);
 
+  if (profile.authExpired) return <SessionExpired onSignOut={onSignOut} />;
   if (profile.loading) return <main className="loading-screen"><span className="loading-mark" aria-hidden="true" /><p>Opening your teaching studio...</p></main>;
   if (profile.error?.includes("PROFILE_NOT_PROVISIONED")) return <Bootstrap api={api} />;
   if (profile.error) return <main className="system-message"><PrismBrand /><h1>We could not open your teacher profile.</h1><Notice error={profile.error} /></main>;
@@ -161,7 +159,7 @@ function Dashboard({ api, name }: { api: TeacherApi; name: string }) {
       <Notice error={resource.error} />
       <section className="content-section">
         <div className="section-title-row"><div><p className="eyebrow">Classroom index</p><h2>Your classes</h2></div><button className="secondary-button" onClick={() => go("/classes/new")}>New class</button></div>
-        {resource.loading ? <Loading /> : classes.length ? (
+        <AsyncState loading={resource.loading} isEmpty={!classes.length} empty={<Empty title="Your first classroom starts here.">Create a class, share its code, and begin building a personalized learning mission.</Empty>}>
           <div className="class-grid">{classes.map((item, index) => (
             <article className="class-card" key={item.id}>
               <div className="class-card-index">{String(index + 1).padStart(2, "0")}</div>
@@ -170,7 +168,7 @@ function Dashboard({ api, name }: { api: TeacherApi; name: string }) {
               <button className="card-link" onClick={() => go(`/classes/${item.id}`)}>Open class <span aria-hidden="true">→</span></button>
             </article>
           ))}</div>
-        ) : <Empty title="Your first classroom starts here.">Create a class, share its code, and begin building a personalized learning mission.</Empty>}
+        </AsyncState>
       </section>
     </>
   );
@@ -232,12 +230,16 @@ function ClassPage({ api, classId }: { api: TeacherApi; classId: string }) {
         <section className="resource-panel">
           <div className="panel-heading"><div><p className="eyebrow">People</p><h2>Students</h2></div><span>{members.data?.total ?? 0}</span></div>
           <Notice error={members.error} />
-          {members.loading ? <Loading /> : members.data?.items.length ? <ul className="resource-list">{members.data.items.map((member, index) => <li key={member.student_id}><span className="person-index">{String(index + 1).padStart(2, "0")}</span><strong>{member.display_name}</strong><small>Joined {date(member.joined_at)}</small></li>)}</ul> : <Empty title="No students yet.">Share the class code above to invite your first student.</Empty>}
+          <AsyncState loading={members.loading} isEmpty={!members.data?.items.length} empty={<Empty title="No students yet.">Share the class code above to invite your first student.</Empty>}>
+            <ul className="resource-list">{members.data?.items.map((member, index) => <li key={member.student_id}><span className="person-index">{String(index + 1).padStart(2, "0")}</span><strong>{member.display_name}</strong><small>Joined {date(member.joined_at)}</small></li>)}</ul>
+          </AsyncState>
         </section>
         <section className="resource-panel">
           <div className="panel-heading"><div><p className="eyebrow">Curriculum</p><h2>Assignments</h2></div><span>{assignments.data?.total ?? 0}</span></div>
           <Notice error={assignments.error} />
-          {assignments.loading ? <Loading /> : assignments.data?.items.length ? <ul className="resource-list assignment-resource-list">{assignments.data.items.map((assignment) => <li key={assignment.id}><button className="resource-link" onClick={() => go(`/assignments/${assignment.id}`)}><span><small>{assignment.topic}</small><strong>{assignment.title}</strong></span><span className={`status-pill ${assignment.status}`}>{assignment.status}</span></button></li>)}</ul> : <Empty title="No assignments yet.">Create a draft, check the objective, then publish it when ready.</Empty>}
+          <AsyncState loading={assignments.loading} isEmpty={!assignments.data?.items.length} empty={<Empty title="No assignments yet.">Create a draft, check the objective, then publish it when ready.</Empty>}>
+            <ul className="resource-list assignment-resource-list">{assignments.data?.items.map((assignment) => <li key={assignment.id}><button className="resource-link" onClick={() => go(`/assignments/${assignment.id}`)}><span><small>{assignment.topic}</small><strong>{assignment.title}</strong></span><span className={`status-pill ${assignment.status}`}>{assignment.status}</span></button></li>)}</ul>
+          </AsyncState>
         </section>
       </div>
     </section>
@@ -295,11 +297,13 @@ function AssignmentPage({ api, assignmentId }: { api: TeacherApi; assignmentId: 
       <section className="content-section submission-section">
         <div className="section-title-row"><div><p className="eyebrow">Class pulse</p><h2>Student progress</h2></div><span className="count-badge">{progress.data?.items.filter((student) => student.status === "submitted").length ?? 0} completed</span></div>
         <Notice error={progress.error} />
-        {progress.loading ? <Loading /> : progress.data?.items.length ? <ul className="progress-roster">{progress.data.items.map((student, index) => {
-          const completion = student.total_steps ? Math.round((student.completed_steps / student.total_steps) * 100) : 0;
-          const statusLabel = student.status === "not_started" ? "Not started" : student.status === "in_progress" ? "In progress" : "Submitted";
-          return <li key={student.student_id}><span className="person-index">{String(index + 1).padStart(2, "0")}</span><div className="progress-student"><strong>{student.student_name}</strong><small>{student.hints_used === 1 ? "1 hint used" : `${student.hints_used} hints used`}</small></div><div className="roster-progress"><div><span style={{ width: `${completion}%` }} /></div><small>{student.total_steps ? `${student.completed_steps}/${student.total_steps} steps` : "No activity yet"}</small></div><span className={`status-pill ${student.status}`}>{statusLabel}</span></li>;
-        })}</ul> : <Empty title="No students yet.">Share the class code to begin seeing progress here.</Empty>}
+        <AsyncState loading={progress.loading} isEmpty={!progress.data?.items.length} empty={<Empty title="No students yet.">Share the class code to begin seeing progress here.</Empty>}>
+          <ul className="progress-roster">{progress.data?.items.map((student, index) => {
+            const completion = student.total_steps ? Math.round((student.completed_steps / student.total_steps) * 100) : 0;
+            const statusLabel = student.status === "not_started" ? "Not started" : student.status === "in_progress" ? "In progress" : "Submitted";
+            return <li key={student.student_id}><span className="person-index">{String(index + 1).padStart(2, "0")}</span><div className="progress-student"><strong>{student.student_name}</strong><small>{student.hints_used === 1 ? "1 hint used" : `${student.hints_used} hints used`}</small></div><div className="roster-progress"><div><span style={{ width: `${completion}%` }} /></div><small>{student.total_steps ? `${student.completed_steps}/${student.total_steps} steps` : "No activity yet"}</small></div><span className={`status-pill ${student.status}`}>{statusLabel}</span></li>;
+          })}</ul>
+        </AsyncState>
       </section>
     </section>
   );

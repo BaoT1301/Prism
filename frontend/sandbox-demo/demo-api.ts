@@ -1,4 +1,5 @@
-import { SandboxApiError, type SandboxApi } from "../lib/sandbox/sandbox-api";
+import { ApiError } from "../lib/api-client";
+import { type SandboxApi } from "../lib/sandbox/sandbox-api";
 import type {
   HintResponse,
   ProgressRequest,
@@ -14,7 +15,12 @@ export interface DemoSandboxApi extends SandboxApi {
   reset(): void;
 }
 
-const DEMO_STORAGE_VERSION = "v2";
+export const DEMO_STORAGE_VERSION = "v2";
+
+/** Builds the localStorage key for a spec at the current storage version. */
+export function demoStorageKey(spec: SandboxSpec, version: string = DEMO_STORAGE_VERSION): string {
+  return `prism-sandbox-demo:${version}:${spec.title}`;
+}
 
 interface StoredDemoState {
   session: SandboxSession;
@@ -35,7 +41,7 @@ function createSession(spec: SandboxSpec): SandboxSession {
 }
 
 export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = window.localStorage): DemoSandboxApi {
-  const storageKey = `prism-sandbox-demo:${DEMO_STORAGE_VERSION}:${spec.title}`;
+  const storageKey = demoStorageKey(spec);
   const readState = (): StoredDemoState | null => {
     const raw = storage.getItem(storageKey);
     return raw ? (JSON.parse(raw) as StoredDemoState) : null;
@@ -43,7 +49,7 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
   const writeState = (state: StoredDemoState) => storage.setItem(storageKey, JSON.stringify(state));
   const requireState = (): StoredDemoState => {
     const state = readState();
-    if (!state) throw new SandboxApiError(404, "SESSION_NOT_FOUND", "The demo session has not started.");
+    if (!state) throw new ApiError("The demo session has not started.", { status: 404, code: "SESSION_NOT_FOUND" });
     return state;
   };
 
@@ -83,7 +89,7 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
     async updateProgress(_sessionId: string, request: ProgressRequest): Promise<ProgressResponse> {
       const state = requireState();
       if (state.session.version !== request.expected_version) {
-        throw new SandboxApiError(409, "SESSION_VERSION_CONFLICT", "The demo session has a newer version.");
+        throw new ApiError("The demo session has a newer version.", { status: 409, code: "SESSION_VERSION_CONFLICT" });
       }
       state.session = {
         ...state.session,
@@ -100,7 +106,7 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
     async requestHint(_sessionId: string, _question?: string, currentStepId?: string): Promise<HintResponse> {
       const state = requireState();
       if (state.session.hints_used >= 3) {
-        throw new SandboxApiError(429, "HINT_LIMIT_REACHED", "No more hints are available for this session.");
+        throw new ApiError("No more hints are available for this session.", { status: 429, code: "HINT_LIMIT_REACHED" });
       }
       state.session = { ...state.session, hints_used: state.session.hints_used + 1, updated_at: new Date().toISOString() };
       writeState(state);
@@ -124,7 +130,7 @@ export function createDemoSandboxApi(spec: SandboxSpec, storage: Storage = windo
       const state = requireState();
       if (state.submission) return state.submission;
       if (state.session.version !== expectedSessionVersion) {
-        throw new SandboxApiError(409, "SESSION_VERSION_CONFLICT", "The demo session has a newer version.");
+        throw new ApiError("The demo session has a newer version.", { status: 409, code: "SESSION_VERSION_CONFLICT" });
       }
       const submission: SubmissionResponse = {
         id: crypto.randomUUID(),

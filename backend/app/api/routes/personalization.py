@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.dependencies.auth import get_student
+from app.api.dependencies.rate_limit import rate_limit
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.db.session import get_db
@@ -26,7 +27,7 @@ def get_service() -> PersonalizationService:
 
 
 @router.post("/assignments/{assignment_id}/start", response_model=StartResponse)
-def start_assignment(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)], service: Annotated[PersonalizationService, Depends(get_service)]):
+def start_assignment(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)], service: Annotated[PersonalizationService, Depends(get_service)], _rate_limit: Annotated[None, Depends(rate_limit("start", 20, 60))] = None):
     assignment = db.get(Assignment, assignment_id)
     if assignment is None:
         raise ApiError(404, "ASSIGNMENT_NOT_FOUND", "The requested assignment was not found.")

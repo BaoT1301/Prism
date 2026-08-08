@@ -1,4 +1,5 @@
 import logging
+import re
 import time
 import uuid
 
@@ -10,9 +11,18 @@ from sqlalchemy import text
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import error_response, http_exception_handler
-from app.db.session import engine
+from app.db.session import get_engine
 
 error_logger = logging.getLogger("app.error")
+
+# L3: an inbound correlation id is only honored if it is a bounded, safe token. This keeps
+# a client from injecting newlines/control characters into logs or forging arbitrary
+# correlation values while still allowing well-formed ids to flow through.
+_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._-]{1,128}$")
+
+
+def _resolve_request_id(raw: str | None) -> str:
+    return raw if raw and _REQUEST_ID_RE.fullmatch(raw) else str(uuid.uuid4())
 
 
 async def internal_error_handler(request: Request, exc: Exception):
@@ -28,6 +38,14 @@ async def internal_error_handler(request: Request, exc: Exception):
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     logging.basicConfig(level=settings.log_level.upper(), format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    # M8: make it obvious in logs which personalization model is active and whether the
+    # deterministic fixture provider is being used (demo_mode or a missing API key).
+    logging.getLogger("app.startup").info(
+        "personalization_configured model=%s demo_mode=%s openai_configured=%s",
+        settings.openai_model,
+        settings.demo_mode,
+        bool(settings.openai_api_key),
+    )
     app = FastAPI(title="Prism API", version="0.1.0", description="API for the personalized learning platform.")
     allowed_origins = [settings.frontend_url]
     if settings.environment in {"development", "test"}:
@@ -36,7 +54,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
-        request.state.request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+        request.state.request_id = _resolve_request_id(request.headers.get("X-Request-ID"))
         started = time.perf_counter()
         response = await call_next(request)
         response.headers["X-Request-ID"] = request.state.request_id
@@ -54,7 +72,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/ready", tags=["health"])
     def ready() -> dict[str, str]:
-        with engine.connect() as connection:
+        with get_engine().connect() as connection:
             connection.execute(text("SELECT 1"))
         return {"status": "ready"}
 

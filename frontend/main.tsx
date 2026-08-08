@@ -8,6 +8,7 @@ import "@fontsource/dm-sans/latin-700.css";
 import "@fontsource/dm-serif-display/latin-400.css";
 import "@fontsource/dm-serif-display/latin-400-italic.css";
 import { AuthApp } from "./auth/AuthApp";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./styles.css";
 
 const clerkKey = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_CLERK_PUBLISHABLE_KEY;
@@ -78,13 +79,17 @@ function App() {
         },
       }}
     >
-      <AuthApp />
+      <ErrorBoundary>
+        <AuthApp />
+      </ErrorBoundary>
     </ClerkProvider>
   );
 }
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );
