@@ -38,6 +38,7 @@ from app.schemas.sessions import (
     SubmitRequest,
 )
 from app.services.analytics import assignment_analytics
+from app.services.audit import record_event
 from app.services.sandbox import automatic_step_ids, build_progressive_hint, submission_ready
 
 router = APIRouter(tags=["sessions"])
@@ -294,6 +295,8 @@ def upsert_review(submission_id: uuid.UUID, data: ReviewRequest, db: Annotated[S
     else:
         review.reviewer_id, review.score, review.feedback = teacher.id, data.score, data.feedback
         db.commit()
+    record_event(db, teacher, "review.upsert", "submission", submission.id)
+    db.commit()
     db.refresh(review)
     return _review_payload(review, teacher.display_name)
 

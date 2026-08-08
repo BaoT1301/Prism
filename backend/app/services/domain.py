@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 
 from app.core.errors import ApiError
 from app.models.models import Assignment, AssignmentStatus, Class, ClassMember, InterestProfile, Profile
-from app.schemas.domain import AssignmentCreate, AssignmentUpdate, ClassCreate, InterestsRequest
+from app.schemas.domain import AssignmentCreate, AssignmentUpdate, ClassCreate, ClassUpdate, InterestsRequest
+from app.services.audit import record_event
 
 SUPPORTED_SANDBOXES = {"parameter_explorer"}
 
@@ -52,6 +53,55 @@ class DomainService:
         if item is None or item.teacher_id != teacher.id:
             raise ApiError(404, "CLASS_NOT_FOUND", "The requested class was not found.")
         return item
+
+    def update_class(self, db: Session, class_id: uuid.UUID, teacher: Profile, data: ClassUpdate) -> Class:
+        item = self.require_owned_class(db, class_id, teacher)
+        changes = data.model_dump(exclude_unset=True)
+        if changes:
+            for key, value in changes.items():
+                setattr(item, key, value)
+            db.commit()
+            db.refresh(item)
+        return item
+
+    def archive_class(self, db: Session, class_id: uuid.UUID, teacher: Profile) -> Class:
+        item = self.require_owned_class(db, class_id, teacher)
+        if item.archived_at is None:
+            item.archived_at = datetime.now(UTC)
+            record_event(db, teacher, "class.archive", "class", item.id)
+            db.commit()
+            db.refresh(item)
+        return item
+
+    def unarchive_class(self, db: Session, class_id: uuid.UUID, teacher: Profile) -> Class:
+        item = self.require_owned_class(db, class_id, teacher)
+        if item.archived_at is not None:
+            item.archived_at = None
+            record_event(db, teacher, "class.unarchive", "class", item.id)
+            db.commit()
+            db.refresh(item)
+        return item
+
+    def regenerate_join_code(self, db: Session, class_id: uuid.UUID, teacher: Profile) -> Class:
+        item = self.require_owned_class(db, class_id, teacher)
+        for _ in range(5):
+            item.join_code = generate_join_code()
+            try:
+                db.commit()
+                db.refresh(item)
+                return item
+            except IntegrityError:
+                db.rollback()
+        raise ApiError(503, "JOIN_CODE_UNAVAILABLE", "Unable to create a class join code.")
+
+    def remove_member(self, db: Session, class_id: uuid.UUID, student_id: uuid.UUID, teacher: Profile) -> None:
+        self.require_owned_class(db, class_id, teacher)
+        member = db.scalar(select(ClassMember).where(ClassMember.class_id == class_id, ClassMember.student_id == student_id))
+        if member is None:
+            raise ApiError(404, "CLASS_MEMBER_NOT_FOUND", "The requested class member was not found.")
+        db.delete(member)
+        record_event(db, teacher, "class.member_remove", "profile", student_id)
+        db.commit()
 
     def join_class(self, db: Session, student: Profile, code: str) -> tuple[ClassMember, bool]:
         item = db.scalar(select(Class).where(Class.join_code == code.upper().strip()))
@@ -115,6 +165,7 @@ class DomainService:
             raise ApiError(422, "UNSUPPORTED_SANDBOX_TYPE", "The requested sandbox type is not supported.")
         item.status = AssignmentStatus.PUBLISHED
         item.published_at = datetime.now(UTC)
+        record_event(db, teacher, "assignment.publish", "assignment", item.id)
         db.commit()
         db.refresh(item)
         return item

@@ -61,6 +61,10 @@ class Profile(TimestampMixin, Base):
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
     role: Mapped[UserRole] = mapped_column(enum_type(UserRole, "user_role"), nullable=False)
+    # GDPR soft-delete (M7): a non-null value marks the account erased. The row is retained
+    # because every FK into profiles is ondelete=RESTRICT; PII is scrubbed on deletion and
+    # require_profile rejects deleted profiles so the account can no longer act.
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     classes_taught: Mapped[list["Class"]] = relationship(back_populates="teacher", foreign_keys="Class.teacher_id")
     memberships: Mapped[list["ClassMember"]] = relationship(back_populates="student")
     interest_profile: Mapped["InterestProfile | None"] = relationship(back_populates="student", uselist=False)
@@ -75,6 +79,9 @@ class Class(TimestampMixin, Base):
     grade_level: Mapped[str] = mapped_column(String(40), nullable=False)
     description: Mapped[str | None] = mapped_column(Text)
     join_code: Mapped[str] = mapped_column(String(12), nullable=False, unique=True)
+    # A non-null value archives the class: it is hidden from the teacher's default class list
+    # (opt back in with ?include_archived=true) without deleting any data.
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     teacher: Mapped[Profile] = relationship(back_populates="classes_taught", foreign_keys=[teacher_id])
     members: Mapped[list["ClassMember"]] = relationship(back_populates="class_", cascade="all, delete-orphan")
     assignments: Mapped[list["Assignment"]] = relationship(back_populates="class_")
@@ -226,3 +233,17 @@ class Submission(Base):
         Index("ix_submissions_assignment_submitted", "assignment_id", "submitted_at"),
         Index("ix_submissions_generated_assignment_id", "generated_assignment_id"),
     )
+
+
+class AuditEvent(Base):
+    __tablename__ = "audit_events"
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # The actor is RESTRICT (an audited profile must not vanish); target_id is a free UUID
+    # pointer with no FK because it may reference rows in different tables (or be null).
+    actor_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("profiles.id", ondelete="RESTRICT"), nullable=False, index=True)
+    action: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    # Serves the newest-first, actor-scoped /me/audit feed.
+    __table_args__ = (Index("ix_audit_events_actor_created", "actor_id", "created_at"),)

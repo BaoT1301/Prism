@@ -1,11 +1,12 @@
 import { type FormEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AppShell, PrismBrand, SessionExpired } from "../../components/AppChrome";
-import { AsyncState, Empty, Loading, Notice } from "../../components/AsyncState";
+import { AsyncState, Empty, Loading, Notice, Skeleton } from "../../components/AsyncState";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { AssignmentAnalyticsPanel } from "../../components/teacher/AssignmentAnalyticsPanel";
 import { SubmissionReview } from "../../components/teacher/SubmissionReview";
 import { ApiError, isAbortError, type AccessTokenProvider } from "../../lib/api-client";
-import { createTeacherApi, type Assignment, type AssignmentInput, type ClassInput } from "./teacher-api";
+import { createTeacherApi, type Assignment, type AssignmentInput, type AuditEntry, type ClassInput, type ClassSummary, type Collection, type Member } from "./teacher-api";
 
 type TeacherApi = ReturnType<typeof createTeacherApi>;
 type Route =
@@ -32,6 +33,8 @@ const message = (reason: unknown) => {
 const date = (value?: string | null) => value
   ? new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(new Date(value))
   : "Not submitted";
+
+type Resource<T> = { data: T | undefined; error?: string; loading: boolean; authExpired: boolean; reload: () => void };
 
 function useResource<T>(load: () => Promise<T>, key: string) {
   const [data, setData] = useState<T>();
@@ -110,10 +113,10 @@ export function TeacherApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
   if (profile.data?.role !== "teacher") return <main className="system-message"><PrismBrand /><h1>This is a teacher workspace.</h1><p>Your current Prism profile is registered as a student.</p></main>;
 
   return (
-    <AppShell role="Teacher" name={profile.data.display_name} onSignOut={onSignOut}>
+    <AppShell role="Teacher" name={profile.data.display_name} onSignOut={onSignOut} deleteAccount={api.deleteAccount}>
       {route.page === "dashboard" && <Dashboard api={api} name={profile.data.display_name} />}
       {route.page === "new-class" && <NewClass api={api} />}
-      {route.page === "class" && <ClassPage api={api} classId={route.classId} />}
+      {route.page === "class" && <ClassPage key={route.classId} api={api} classId={route.classId} />}
       {route.page === "new-assignment" && <NewAssignment api={api} classId={route.classId} />}
       {route.page === "assignment" && <AssignmentPage api={api} assignmentId={route.assignmentId} />}
       {route.page === "submission" && <SubmissionReviewPage api={api} submissionId={route.submissionId} />}
@@ -143,8 +146,10 @@ function Bootstrap({ api }: { api: TeacherApi }) {
 }
 
 function Dashboard({ api, name }: { api: TeacherApi; name: string }) {
-  const resource = useResource(api.classes, "classes");
+  const [showArchived, setShowArchived] = useState(false);
+  const resource = useResource(() => api.classes(showArchived), `classes-${showArchived}`);
   const classes = resource.data?.items ?? [];
+  const activeCount = classes.filter((item) => !item.archived_at).length;
   const studentTotal = classes.reduce((total, item) => total + item.student_count, 0);
   const assignmentTotal = classes.reduce((total, item) => total + item.assignment_count, 0);
   const firstName = name.trim().split(/\s+/)[0];
@@ -156,25 +161,35 @@ function Dashboard({ api, name }: { api: TeacherApi; name: string }) {
         <div className="hero-composition teacher-composition" aria-hidden="true"><span className="lesson-sheet"><i>OBJECTIVE</i><b>F = ma</b><small>same destination</small></span><span className="student-path path-one">sport</span><span className="student-path path-two">space</span><span className="student-path path-three">speed</span></div>
       </section>
       <section className="metric-strip" aria-label="Classroom overview">
-        <div><strong>{classes.length}</strong><span>Active classes</span></div>
+        <div><strong>{activeCount}</strong><span>Active classes</span></div>
         <div><strong>{studentTotal}</strong><span>Students reached</span></div>
         <div><strong>{assignmentTotal}</strong><span>Learning missions</span></div>
         <p>Personalization changes the way in—not the rigor, goal, or standard.</p>
       </section>
       <Notice error={resource.error} />
       <section className="content-section">
-        <div className="section-title-row"><div><p className="eyebrow">Classroom index</p><h2>Your classes</h2></div><button className="secondary-button" onClick={() => go("/classes/new")}>New class</button></div>
-        <AsyncState loading={resource.loading} isEmpty={!classes.length} empty={<Empty title="Your first classroom starts here.">Create a class, share its code, and begin building a personalized learning mission.</Empty>}>
-          <div className="class-grid">{classes.map((item, index) => (
-            <article className="class-card" key={item.id}>
-              <div className="class-card-index">{String(index + 1).padStart(2, "0")}</div>
-              <p className="class-subject">{item.subject}</p><h3>{item.name}</h3><p>Grade {item.grade_level}</p>
-              <div className="class-meta"><span>{item.student_count} students</span><span>{item.assignment_count} assignments</span></div>
-              <button className="card-link" onClick={() => go(`/classes/${item.id}`)}>Open class <span aria-hidden="true">→</span></button>
-            </article>
-          ))}</div>
+        <div className="section-title-row">
+          <div><p className="eyebrow">Classroom index</p><h2>Your classes</h2></div>
+          <div className="section-title-actions">
+            <button type="button" className="secondary-button" data-testid="toggle-archived" aria-pressed={showArchived} onClick={() => setShowArchived((value) => !value)}>{showArchived ? "Hide archived" : "Show archived"}</button>
+            <button className="secondary-button" onClick={() => go("/classes/new")}>New class</button>
+          </div>
+        </div>
+        <AsyncState loading={resource.loading} isEmpty={!classes.length} empty={<Empty title={showArchived ? "No classes to show." : "Your first classroom starts here."}>{showArchived ? "You have no active or archived classes yet." : "Create a class, share its code, and begin building a personalized learning mission."}</Empty>}>
+          <div className="class-grid">{classes.map((item, index) => {
+            const archived = Boolean(item.archived_at);
+            return (
+              <article className={`class-card ${archived ? "is-archived" : ""}`} key={item.id}>
+                <div className="class-card-index"><span>{String(index + 1).padStart(2, "0")}</span>{archived && <span className="status-pill archived">Archived</span>}</div>
+                <p className="class-subject">{item.subject}</p><h3>{item.name}</h3><p>Grade {item.grade_level}</p>
+                <div className="class-meta"><span>{item.student_count} students</span><span>{item.assignment_count} assignments</span></div>
+                <button className="card-link" onClick={() => go(`/classes/${item.id}`)}>Open class <span aria-hidden="true">→</span></button>
+              </article>
+            );
+          })}</div>
         </AsyncState>
       </section>
+      <RecentActivity api={api} />
     </>
   );
 }
@@ -206,39 +221,213 @@ function NewClass({ api }: { api: TeacherApi }) {
   );
 }
 
+/** Turns a machine audit action/target ("class.archived" / "class") into a readable phrase. */
+function humanizeAudit(entry: AuditEntry): string {
+  const action = entry.action.replace(/[._]+/g, " ").trim();
+  const target = entry.target_type.replace(/[._]+/g, " ").trim();
+  const label = action ? action.charAt(0).toUpperCase() + action.slice(1) : "Activity";
+  return target ? `${label} · ${target}` : label;
+}
+
+function RecentActivity({ api }: { api: TeacherApi }) {
+  const resource = useResource(api.audit, "audit");
+  const entries = resource.data ?? [];
+  // Audit is a supporting nicety — never let its absence or failure disrupt the dashboard.
+  if (resource.error || (!resource.loading && entries.length === 0)) return null;
+
+  return (
+    <section className="content-section" data-testid="recent-activity">
+      <div className="section-title-row"><div><p className="eyebrow">Behind the scenes</p><h2>Recent activity</h2></div><p>A running log of changes across your classes and account.</p></div>
+      <AsyncState loading={resource.loading} isEmpty={!entries.length} skeleton={<Skeleton rows={2} className="assignment-skeleton" />} empty={<Empty title="No recent activity.">Changes you make will show up here.</Empty>}>
+        <ul className="activity-list">{entries.map((entry, index) => (
+          <li key={`${entry.action}-${entry.target_id}-${index}`}>
+            <span className="person-index">{String(index + 1).padStart(2, "0")}</span>
+            <div className="activity-line"><strong>{humanizeAudit(entry)}</strong>{entry.target_id && <small>{entry.target_id}</small>}</div>
+            <time>{date(entry.created_at)}</time>
+          </li>
+        ))}</ul>
+      </AsyncState>
+    </section>
+  );
+}
+
+export function ClassSettings({ api, currentClass, onClassChange }: { api: Pick<TeacherApi, "updateClass" | "archiveClass" | "unarchiveClass">; currentClass: ClassSummary; onClassChange: (updated: ClassSummary) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(currentClass.name);
+  const [description, setDescription] = useState(currentClass.description ?? "");
+  const [saving, setSaving] = useState(false);
+  const [archiving, setArchiving] = useState(false);
+  const [error, setError] = useState<string>();
+  const [saved, setSaved] = useState(false);
+  const archived = Boolean(currentClass.archived_at);
+
+  // Reseed the rename fields if the class identity changes underneath us.
+  useEffect(() => { setName(currentClass.name); setDescription(currentClass.description ?? ""); }, [currentClass.id]);
+
+  const save = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmed = name.trim();
+    if (!trimmed) { setError("A class needs a name."); return; }
+    setError(undefined);
+    setSaved(false);
+    setSaving(true);
+    void api.updateClass(currentClass.id, { name: trimmed, description: description.trim() || null })
+      .then((updated) => { onClassChange(updated); setEditing(false); setSaved(true); })
+      .catch((reason) => setError(message(reason)))
+      .finally(() => setSaving(false));
+  };
+
+  const toggleArchive = () => {
+    setError(undefined);
+    setSaved(false);
+    setArchiving(true);
+    const request = archived ? api.unarchiveClass(currentClass.id) : api.archiveClass(currentClass.id);
+    void request.then(onClassChange).catch((reason) => setError(message(reason))).finally(() => setArchiving(false));
+  };
+
+  return (
+    <section className="class-settings" data-testid="class-settings">
+      <div className="class-settings-head">
+        <div><p className="eyebrow">Class settings</p><h2>Manage this class</h2></div>
+        <div className="class-settings-actions">
+          <button type="button" className="secondary-button" onClick={() => { setEditing((value) => !value); setSaved(false); setError(undefined); }}>{editing ? "Close editor" : "Rename"}</button>
+          <button type="button" className="secondary-button" data-testid="archive-class" onClick={toggleArchive} disabled={archiving}>{archiving ? "Saving…" : archived ? "Unarchive class" : "Archive class"}</button>
+        </div>
+      </div>
+      {error && <Notice error={error} />}
+      {saved && !editing && <p className="success-note">Class updated.</p>}
+      {archived && <p className="muted class-settings-note">This class is archived. Students can’t join or open its assignments until you unarchive it.</p>}
+      {editing && (
+        <form className="form class-settings-form" data-testid="rename-class" onSubmit={save}>
+          <Field label="Class name"><input value={name} onChange={(event) => { setName(event.target.value); setSaved(false); }} required /></Field>
+          <Field label="Description"><textarea rows={3} value={description} placeholder="A short note about what this class explores." onChange={(event) => { setDescription(event.target.value); setSaved(false); }} /></Field>
+          <div className="form-submit-row"><p>Renaming updates the class everywhere instantly.</p><button disabled={saving}>{saving ? "Saving…" : "Save changes"}</button></div>
+        </form>
+      )}
+    </section>
+  );
+}
+
+export function RegenerateCode({ api, classId, onRegenerated }: { api: Pick<TeacherApi, "regenerateJoinCode">; classId: string; onRegenerated: (joinCode: string) => void }) {
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  const regenerate = () => {
+    setBusy(true);
+    setError(undefined);
+    void api.regenerateJoinCode(classId)
+      .then(({ join_code }) => {
+        if (!join_code) { setError("The server did not return a new code. Please try again."); return; }
+        onRegenerated(join_code);
+        setConfirming(false);
+      })
+      .catch((reason) => setError(message(reason)))
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <>
+      <button type="button" className="secondary-button" data-testid="regenerate-code" onClick={() => { setError(undefined); setConfirming(true); }}>Regenerate code</button>
+      <ConfirmDialog open={confirming} title="Regenerate the join code?" confirmLabel="Regenerate code" confirmTestId="confirm-regenerate-code" tone="danger" busy={busy} onConfirm={regenerate} onCancel={() => { if (!busy) { setConfirming(false); setError(undefined); } }}>
+        <p>A new code is generated immediately and the current one stops working. Students who already joined stay enrolled, but anyone with the old code will need the new one.</p>
+        {error && <Notice error={error} />}
+      </ConfirmDialog>
+    </>
+  );
+}
+
+export function Roster({ api, classId, resource }: { api: Pick<TeacherApi, "removeMember">; classId: string; resource: Resource<Collection<Member>> }) {
+  const [items, setItems] = useState<Member[]>();
+  const [pending, setPending] = useState<Member>();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string>();
+
+  // Mirror the loaded roster locally so an optimistic removal can be reverted.
+  useEffect(() => { if (resource.data) setItems(resource.data.items); }, [resource.data]);
+  const list = items ?? resource.data?.items ?? [];
+
+  const remove = () => {
+    if (!pending) return;
+    const target = pending;
+    const previous = list;
+    setBusy(true);
+    setError(undefined);
+    setItems(list.filter((member) => member.student_id !== target.student_id)); // optimistic
+    void api.removeMember(classId, target.student_id)
+      .then(() => setPending(undefined))
+      .catch((reason) => { setItems(previous); setError(message(reason)); })
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <section className="resource-panel">
+      <div className="panel-heading"><div><p className="eyebrow">People</p><h2>Students</h2></div><span>{list.length}</span></div>
+      <Notice error={resource.error} />
+      {error && <Notice error={error} />}
+      <AsyncState loading={resource.loading} isEmpty={!list.length} empty={<Empty title="No students yet.">Share the class code above to invite your first student.</Empty>}>
+        <ul className="resource-list roster-list">{list.map((member, index) => (
+          <li key={member.student_id}>
+            <span className="person-index">{String(index + 1).padStart(2, "0")}</span>
+            <div className="roster-person"><strong>{member.display_name}</strong><small>Joined {date(member.joined_at)}</small></div>
+            <button type="button" className="text-button danger-link" data-testid={`remove-member-${member.student_id}`} onClick={() => { setError(undefined); setPending(member); }}>Remove</button>
+          </li>
+        ))}</ul>
+      </AsyncState>
+      <ConfirmDialog
+        open={Boolean(pending)}
+        title="Remove this student?"
+        confirmLabel="Remove student"
+        confirmTestId="confirm-remove-member"
+        tone="danger"
+        busy={busy}
+        onConfirm={remove}
+        onCancel={() => { if (!busy) { setPending(undefined); setError(undefined); } }}
+      >
+        <p>{pending ? `${pending.display_name} will lose access to this class and its assignments. They can rejoin later with the class code.` : ""}</p>
+      </ConfirmDialog>
+    </section>
+  );
+}
+
 function ClassPage({ api, classId }: { api: TeacherApi; classId: string }) {
   const classResource = useResource(() => api.classDetail(classId), `class-${classId}`);
   const members = useResource(() => api.members(classId), `members-${classId}`);
   const assignments = useResource(() => api.assignments(classId), `assignments-${classId}`);
+  const [override, setOverride] = useState<ClassSummary>();
   const [copied, setCopied] = useState(false);
   if (classResource.loading) return <Loading label="Opening class..." />;
-  if (!classResource.data) return <Notice error={classResource.error} />;
-  const currentClass = classResource.data;
+  const currentClass = override ?? classResource.data;
+  if (!currentClass) return <Notice error={classResource.error} />;
+  const archived = Boolean(currentClass.archived_at);
 
   return (
     <section className="page-stack">
       <PageBack href="#/">All classes</PageBack>
-      <div className="class-detail-hero">
-        <div><p className="eyebrow">{currentClass.subject} · Grade {currentClass.grade_level}</p><h1>{currentClass.name}</h1><p>{currentClass.description || "A shared space for personalized learning."}</p></div>
+      <div className={`class-detail-hero ${archived ? "is-archived" : ""}`}>
+        <div>
+          <p className="eyebrow">{currentClass.subject} · Grade {currentClass.grade_level}</p>
+          <h1>{currentClass.name}</h1>
+          <p>{currentClass.description || "A shared space for personalized learning."}</p>
+          {archived && <span className="status-pill archived class-archived-flag">Archived</span>}
+        </div>
         <button onClick={() => go(`/classes/${classId}/assignments/new`)}>Create assignment <span aria-hidden="true">→</span></button>
       </div>
+      <ClassSettings api={api} currentClass={currentClass} onClassChange={setOverride} />
       <div className="join-code-panel">
         <div><p className="eyebrow">Student entry</p><h2>Share this class code.</h2><p>Students enter it once to join this classroom.</p></div>
         <strong>{currentClass.join_code}</strong>
-        <button className="secondary-button" onClick={() => {
-          void navigator.clipboard?.writeText(currentClass.join_code);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1600);
-        }}>{copied ? "Copied" : "Copy code"}</button>
+        <div className="join-code-actions">
+          <button className="secondary-button" onClick={() => {
+            void navigator.clipboard?.writeText(currentClass.join_code);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1600);
+          }}>{copied ? "Copied" : "Copy code"}</button>
+          <RegenerateCode api={api} classId={classId} onRegenerated={(join_code) => setOverride({ ...currentClass, join_code })} />
+        </div>
       </div>
       <div className="two-col resource-columns">
-        <section className="resource-panel">
-          <div className="panel-heading"><div><p className="eyebrow">People</p><h2>Students</h2></div><span>{members.data?.total ?? 0}</span></div>
-          <Notice error={members.error} />
-          <AsyncState loading={members.loading} isEmpty={!members.data?.items.length} empty={<Empty title="No students yet.">Share the class code above to invite your first student.</Empty>}>
-            <ul className="resource-list">{members.data?.items.map((member, index) => <li key={member.student_id}><span className="person-index">{String(index + 1).padStart(2, "0")}</span><strong>{member.display_name}</strong><small>Joined {date(member.joined_at)}</small></li>)}</ul>
-          </AsyncState>
-        </section>
+        <Roster api={api} classId={classId} resource={members} />
         <section className="resource-panel">
           <div className="panel-heading"><div><p className="eyebrow">Curriculum</p><h2>Assignments</h2></div><span>{assignments.data?.total ?? 0}</span></div>
           <Notice error={assignments.error} />

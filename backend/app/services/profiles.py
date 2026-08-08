@@ -1,3 +1,5 @@
+from datetime import UTC, datetime
+
 import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -6,22 +8,30 @@ from app.core.errors import ApiError
 from app.core.config import Settings
 from app.models.models import Profile, UserRole
 from app.schemas.profiles import ProfileBootstrapRequest
+from app.services.audit import record_event
 from app.services.jwt import AuthClaims
 
 
 class ProfileService:
-    # TODO (M7, deferred): add a GDPR soft-delete + anonymize path. Every FK into `profiles`
-    # is ondelete=RESTRICT, so account erasure needs a dedicated flow: mark the profile
-    # deleted, scrub PII (email/display_name), and have require_profile reject deleted
-    # profiles. Deferred from the hardening pass because it touches the authentication path.
     def get_by_auth_id(self, db: Session, auth_user_id) -> Profile | None:
         return db.scalar(select(Profile).where(Profile.auth_user_id == auth_user_id))
 
     def require_profile(self, db: Session, claims: AuthClaims) -> Profile:
         profile = self.get_by_auth_id(db, claims.subject)
-        if profile is None:
+        # A soft-deleted (GDPR-erased) profile is treated as if it were never provisioned, so
+        # a deleted account can no longer authenticate into any protected route (M7).
+        if profile is None or profile.deleted_at is not None:
             raise ApiError(404, "PROFILE_NOT_PROVISIONED", "Application profile has not been provisioned.")
         return profile
+
+    def delete_account(self, db: Session, profile: Profile) -> None:
+        """Soft-delete the caller: mark deleted and scrub PII. FKs are RESTRICT by design, so
+        the row is retained (referential integrity) while email/display_name are anonymized."""
+        profile.deleted_at = datetime.now(UTC)
+        profile.email = f"deleted+{profile.id}@removed.invalid"
+        profile.display_name = "Deleted user"
+        record_event(db, profile, "account.delete", "profile", profile.id)
+        db.commit()
 
     def bootstrap(self, db: Session, claims: AuthClaims, data: ProfileBootstrapRequest, settings: Settings) -> tuple[Profile, bool]:
         profile = self.get_by_auth_id(db, claims.subject)

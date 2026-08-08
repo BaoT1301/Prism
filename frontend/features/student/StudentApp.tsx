@@ -8,6 +8,7 @@ import { ensureItems } from "../../lib/guards";
 import { createSandboxApi } from "../../lib/sandbox/sandbox-api";
 import { SandboxRenderer } from "../sandbox/SandboxRenderer";
 import type { SandboxLaunch } from "../sandbox/sandbox-types";
+import { GenerationGate } from "./GenerationGate";
 import { createStudentApi, type StudentSubmission } from "./student-api";
 
 type ClassItem = { id: string; name: string; subject: string; grade_level: string };
@@ -47,6 +48,7 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
   const [selected, setSelected] = useState<string>();
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [launch, setLaunch] = useState<SandboxLaunch>();
+  const [pending, setPending] = useState<{ id: string; title: string }>();
   const [error, setError] = useState<string>();
   const [authExpired, setAuthExpired] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,6 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
   const [joining, setJoining] = useState(false);
   const [savingInterests, setSavingInterests] = useState(false);
   const [interestsSaved, setInterestsSaved] = useState(false);
-  const [launchingId, setLaunchingId] = useState<string>();
   const [feedback, setFeedback] = useState<StudentSubmission[]>([]);
   const [feedbackLoading, setFeedbackLoading] = useState(true);
   const [feedbackError, setFeedbackError] = useState<string>();
@@ -67,6 +68,13 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
     if (reason instanceof ApiError && reason.isAuthError) { setAuthExpired(true); return; }
     setError(reason instanceof Error ? reason.message : "Something went wrong.");
   }, []);
+
+  // Stable adapters so the generation gate's polling effect does not re-run.
+  const launchAssignment = useCallback((id: string) => sandboxApi.launchAssignment(id), [sandboxApi]);
+  const generationStatus = useCallback((id: string, signal?: AbortSignal) => studentApi.generationStatus(id, signal), [studentApi]);
+  const handleGenerationReady = useCallback((launched: SandboxLaunch) => { setPending(undefined); setLaunch(launched); }, []);
+  const handleGenerationCancel = useCallback(() => setPending(undefined), []);
+  const handleGenerationAuthExpired = useCallback(() => { setPending(undefined); setAuthExpired(true); }, []);
 
   // Refresh only the class list (used after joining) so unsaved interest drafts survive.
   const loadClasses = useCallback(async () => {
@@ -131,6 +139,20 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
 
   if (authExpired) return <SessionExpired onSignOut={onSignOut} />;
 
+  if (pending) {
+    return (
+      <GenerationGate
+        assignmentId={pending.id}
+        assignmentTitle={pending.title}
+        launch={launchAssignment}
+        status={generationStatus}
+        onReady={handleGenerationReady}
+        onCancel={handleGenerationCancel}
+        onAuthExpired={handleGenerationAuthExpired}
+      />
+    );
+  }
+
   if (launch) {
     return (
       <SandboxRenderer
@@ -146,7 +168,7 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
   const selectedClass = classes.find((item) => item.id === selected);
 
   return (
-    <AppShell role="Student" onSignOut={onSignOut}>
+    <AppShell role="Student" onSignOut={onSignOut} deleteAccount={studentApi.deleteAccount}>
       <section className="dashboard-hero student-hero">
         <div className="hero-copy">
           <p className="eyebrow">Your learning studio</p>
@@ -284,11 +306,10 @@ export function StudentApp({ getAccessToken, onSignOut }: { getAccessToken: Acce
                   <span className="assignment-icon" aria-hidden="true">↗</span>
                   <div><p>{assignment.topic}</p><h3>{assignment.title}</h3></div>
                   <span className="status-pill published">Ready</span>
-                  <button type="button" disabled={launchingId === assignment.id} onClick={() => {
+                  <button type="button" onClick={() => {
                     setError(undefined);
-                    setLaunchingId(assignment.id);
-                    void sandboxApi.launchAssignment(assignment.id).then(setLaunch).catch(handleFailure).finally(() => setLaunchingId(undefined));
-                  }}>{launchingId === assignment.id ? "Personalizing..." : "Start assignment"}</button>
+                    setPending({ id: assignment.id, title: assignment.title });
+                  }}>Start assignment</button>
                 </article>
               ))}
             </div>

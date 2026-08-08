@@ -5,6 +5,19 @@ import { ensureArray } from "../../lib/guards";
 export type StudentReview = { score: number | null; feedback: string; reviewed_at: string };
 export type StudentSubmission = { assignment_id: string; assignment_title: string; submitted_at: string; review: StudentReview | null };
 
+/** Personalization/generation lifecycle for an assignment launch. */
+export type GenerationStatus = "none" | "pending" | "completed" | "failed";
+
+/**
+ * Coerces the generation-status payload to a known state. Anything unexpected
+ * degrades to `"pending"` so the launch UI keeps waiting (bounded by the poller's
+ * own attempt cap) rather than surfacing a false failure on transient drift.
+ */
+function normalizeGenerationStatus(value: { status?: unknown } | null | undefined): GenerationStatus {
+  const status = value?.status;
+  return status === "none" || status === "pending" || status === "completed" || status === "failed" ? status : "pending";
+}
+
 function normalizeReview(value: StudentReview | null | undefined): StudentReview | null {
   if (!value || typeof value !== "object") return null;
   return {
@@ -29,6 +42,10 @@ export function createStudentApi(getAccessToken?: AccessTokenProvider) {
     // normalized array so the feedback list can never crash on shape drift.
     mySubmissions: async (signal?: AbortSignal) =>
       normalizeSubmissions(await apiRequest<StudentSubmission[]>("/api/v1/me/submissions", { signal }, getAccessToken)),
+    // Polled while an assignment personalization is in flight.
+    generationStatus: async (assignmentId: string, signal?: AbortSignal): Promise<GenerationStatus> =>
+      normalizeGenerationStatus(await apiRequest<{ status?: string }>(`/api/v1/assignments/${assignmentId}/generation-status`, { signal }, getAccessToken)),
+    deleteAccount: () => apiRequest<void>("/api/v1/me", { method: "DELETE" }, getAccessToken),
   };
 }
 

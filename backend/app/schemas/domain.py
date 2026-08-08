@@ -1,6 +1,7 @@
 
 import uuid
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -11,6 +12,13 @@ class ClassCreate(BaseModel):
     name: str = Field(min_length=1, max_length=160)
     subject: str = Field(min_length=1, max_length=100)
     grade_level: str = Field(min_length=1, max_length=40)
+    description: str | None = Field(default=None, max_length=2000)
+
+
+class ClassUpdate(BaseModel):
+    # Partial update: only fields explicitly present are applied. ``description`` may be set
+    # to null to clear it; ``name`` cannot be blanked (min_length=1) when provided.
+    name: str | None = Field(default=None, min_length=1, max_length=160)
     description: str | None = Field(default=None, max_length=2000)
 
 
@@ -68,6 +76,7 @@ class ClassResponse(BaseModel):
     grade_level: str
     description: str | None
     join_code: str
+    archived_at: datetime | None
     student_count: int = Field(ge=0)
     assignment_count: int = Field(ge=0)
     created_at: datetime
@@ -131,3 +140,24 @@ class InterestProfileResponse(BaseModel):
     favorite_subjects: list[str]
     additional_interests: list[str]
     updated_at: datetime
+
+
+class GenerationStatusResponse(BaseModel):
+    # "none" means no generation exists for the caller's current interest-profile version and
+    # the assignment's current content version; otherwise the GeneratedAssignment's status.
+    status: Literal["none", "pending", "completed", "failed"]
+
+
+class AuditEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    action: str
+    target_type: str
+    target_id: uuid.UUID | None
+    created_at: datetime
+
+
+class AuditEventListResponse(BaseModel):
+    items: list[AuditEventResponse]
+    total: int = Field(ge=0)

@@ -599,3 +599,60 @@ input:disabled { border-style: dashed; color: var(--muted); background: rgba(23,
   .review-form-grid { grid-template-columns: 1fr; }
   .feedback-card-head { align-items: flex-start; flex-direction: column; }
 }
+
+/* Platform & lifecycle — confirm dialogs, class settings, generation gate */
+.confirm-overlay { position: fixed; inset: 0; z-index: 100; display: grid; padding: 1.5rem; place-items: center; background: rgba(23, 23, 18, 0.42); backdrop-filter: blur(3px); }
+.confirm-dialog { width: min(100%, 32rem); padding: clamp(1.6rem, 4vw, 2.4rem); border: 1px solid var(--ink); border-radius: var(--radius-lg); background: var(--paper-light); box-shadow: 12px 12px 0 var(--ink); }
+.confirm-dialog .eyebrow { margin-bottom: 0.6rem; }
+.confirm-dialog h2 { margin: 0 0 0.9rem; font-family: var(--display); font-size: clamp(2rem, 4vw, 2.8rem); font-weight: 400; line-height: 0.98; }
+.confirm-body { color: var(--muted); }
+.confirm-body p { margin: 0 0 0.8rem; }
+.confirm-body p:last-child { margin-bottom: 0; }
+.confirm-body .notice { margin-top: 0.9rem; }
+.confirm-actions { display: flex; margin-top: 1.6rem; align-items: center; justify-content: flex-end; gap: 0.7rem; flex-wrap: wrap; }
+.danger-button { color: #fff !important; background: var(--coral) !important; border-color: var(--coral) !important; }
+.text-button.danger-link { color: var(--coral); }
+.text-button.danger-link:hover { color: #c1362a; }
+
+.class-settings { margin-top: 1.2rem; padding: clamp(1.5rem, 3.5vw, 2.4rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--paper-light); }
+.class-settings-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.5rem; }
+.class-settings-head h2 { margin: 0; font-family: var(--display); font-size: clamp(1.8rem, 3vw, 2.6rem); font-weight: 400; line-height: 0.95; }
+.class-settings-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.class-settings > .notice { margin-top: 1.2rem; }
+.class-settings > .success-note { margin: 1.2rem 0 0; }
+.class-settings-note { margin: 1.2rem 0 0; }
+.class-settings-form { margin-top: 1.6rem; padding-top: 1.6rem; border-top: 1px solid var(--line); }
+.section-title-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+
+.class-card-index { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.class-card.is-archived { opacity: 0.7; }
+.class-card.is-archived:hover { opacity: 1; }
+.class-detail-hero.is-archived { background: #ece7dc; }
+.class-archived-flag { margin-top: 1.2rem; }
+.join-code-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+
+.roster-person { display: grid; gap: 0.25rem; }
+.roster-person strong { font-size: 0.9rem; }
+.roster-person small { color: var(--muted); }
+.roster-list .text-button { justify-self: end; }
+
+.activity-list { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-strong); }
+.activity-list li { display: grid; padding: 1rem 0; grid-template-columns: 2.4rem 1fr auto; align-items: center; gap: 1rem; border-bottom: 1px solid var(--line); }
+.activity-line { display: grid; gap: 0.2rem; }
+.activity-line strong { font-size: 0.92rem; }
+.activity-line small { color: var(--muted); font-size: 0.72rem; word-break: break-all; }
+.activity-list time { color: var(--muted); font-size: 0.78rem; white-space: nowrap; }
+
+.generation-pending { display: grid; min-height: 100dvh; padding: 2rem; place-items: center; background: var(--paper); }
+.generation-pending-card { width: min(100%, 40rem); padding: clamp(2rem, 5vw, 3.5rem); border: 1px solid var(--line-strong); border-radius: var(--radius-lg); background: var(--paper-light); box-shadow: 12px 12px 0 var(--lavender); }
+.generation-pending-card .prism-brand { margin-bottom: 2rem; }
+.generation-pending-card h1 { margin: 0.6rem 0 1rem; font-family: var(--display); font-size: clamp(2.8rem, 6vw, 4.6rem); font-weight: 400; line-height: 0.9; letter-spacing: -0.04em; }
+.generation-pending-card > p { max-width: 34rem; color: var(--muted); }
+.generation-pending-card .skeleton-grid { margin-top: 1.6rem; }
+.generation-pending-actions { display: flex; margin-top: 1.8rem; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+
+@media (max-width: 700px) {
+  .class-settings-head { align-items: flex-start; flex-direction: column; }
+  .confirm-actions { flex-direction: column-reverse; align-items: stretch; }
+  .confirm-actions button { width: 100%; }
+}

@@ -3,7 +3,7 @@ import { ensureArray, ensureCollectionShape, toFiniteNumber } from "../../lib/gu
 import type { ReflectionAnswer } from "../sandbox/sandbox-types";
 
 export type Profile = { id: string; email: string; display_name: string; role: "teacher" | "student"; created_at: string };
-export type ClassSummary = { id: string; name: string; subject: string; grade_level: string; description?: string | null; join_code: string; student_count: number; assignment_count: number; created_at: string };
+export type ClassSummary = { id: string; name: string; subject: string; grade_level: string; description?: string | null; join_code: string; student_count: number; assignment_count: number; created_at: string; archived_at?: string | null };
 export type Assignment = { id: string; class_id: string; title: string; topic: string; learning_objective: string; grade_level: string; instructions?: string | null; sandbox_type: "parameter_explorer"; status: "draft" | "published" | "archived"; content_version: number; published_at?: string | null; created_at: string };
 export type Member = { student_id: string; display_name: string; joined_at: string };
 export type Review = { id: string; submission_id: string; score: number | null; feedback: string; reviewer_name: string; reviewed_at: string };
@@ -24,7 +24,9 @@ export type AssignmentAnalytics = {
 };
 export type Collection<T> = { items: T[]; total: number };
 export type ClassInput = Pick<ClassSummary, "name" | "subject" | "grade_level" | "description">;
+export type ClassUpdate = { name?: string; description?: string | null };
 export type AssignmentInput = Pick<Assignment, "title" | "topic" | "learning_objective" | "grade_level" | "instructions" | "sandbox_type">;
+export type AuditEntry = { action: string; target_type: string; target_id: string; created_at: string };
 
 /**
  * Runtime normalizers for the new grading/analytics endpoints. The backend is
@@ -32,6 +34,45 @@ export type AssignmentInput = Pick<Assignment, "title" | "topic" | "learning_obj
  * collapse a malformed `review` to `null` — nothing here can crash a `.map` or
  * render `NaN`, even if the wire shape drifts.
  */
+/**
+ * Coerces an untrusted class payload into the shape the teacher UI relies on.
+ * The lifecycle endpoints (rename/archive/regenerate) are built in parallel, so
+ * every field is guarded — a missing `archived_at` collapses to `null` (active),
+ * counts to `0`, and strings to `""`, so nothing here can crash a render.
+ */
+function normalizeClass(value: ClassSummary | null | undefined): ClassSummary {
+  const source = (value ?? {}) as Partial<ClassSummary>;
+  return {
+    id: typeof source.id === "string" ? source.id : "",
+    name: typeof source.name === "string" ? source.name : "",
+    subject: typeof source.subject === "string" ? source.subject : "",
+    grade_level: typeof source.grade_level === "string" ? source.grade_level : "",
+    description: typeof source.description === "string" ? source.description : null,
+    join_code: typeof source.join_code === "string" ? source.join_code : "",
+    student_count: toFiniteNumber(source.student_count, 0),
+    assignment_count: toFiniteNumber(source.assignment_count, 0),
+    created_at: typeof source.created_at === "string" ? source.created_at : "",
+    archived_at: typeof source.archived_at === "string" ? source.archived_at : null,
+  };
+}
+
+/**
+ * Pulls a fresh join code out of either supported regenerate response shape:
+ * a bare `{ join_code }` or a full updated class that carries `join_code`.
+ */
+function normalizeJoinCode(value: { join_code?: unknown } | null | undefined): { join_code: string } {
+  return { join_code: typeof value?.join_code === "string" ? value.join_code : "" };
+}
+
+function normalizeAuditEntry(value: Partial<AuditEntry> | null | undefined): AuditEntry {
+  return {
+    action: typeof value?.action === "string" ? value.action : "",
+    target_type: typeof value?.target_type === "string" ? value.target_type : "",
+    target_id: typeof value?.target_id === "string" ? value.target_id : "",
+    created_at: typeof value?.created_at === "string" ? value.created_at : "",
+  };
+}
+
 function normalizeReview(value: Review | null | undefined): Review | null {
   if (!value || typeof value !== "object") return null;
   return {
@@ -111,9 +152,22 @@ export function createTeacherApi(getAccessToken?: AccessTokenProvider) {
   return {
     me: () => apiRequest<Profile>("/api/v1/me", {}, getAccessToken),
     bootstrap: (display_name: string) => apiRequest<Profile>("/api/v1/profiles/bootstrap", { method: "POST", body: JSON.stringify({ display_name, role: "teacher" }) }, getAccessToken),
-    classes: async () => ensureCollectionShape(await apiRequest<Collection<ClassSummary>>("/api/v1/classes", {}, getAccessToken)),
-    createClass: (body: ClassInput) => apiRequest<ClassSummary>("/api/v1/classes", { method: "POST", body: JSON.stringify(body) }, getAccessToken),
-    classDetail: (id: string) => apiRequest<ClassSummary>(`/api/v1/classes/${id}`, {}, getAccessToken),
+    classes: async (includeArchived = false) => {
+      const collection = ensureCollectionShape(await apiRequest<Collection<ClassSummary>>(`/api/v1/classes${includeArchived ? "?include_archived=true" : ""}`, {}, getAccessToken));
+      return { items: collection.items.map(normalizeClass), total: collection.total };
+    },
+    createClass: async (body: ClassInput) => normalizeClass(await apiRequest<ClassSummary>("/api/v1/classes", { method: "POST", body: JSON.stringify(body) }, getAccessToken)),
+    classDetail: async (id: string) => normalizeClass(await apiRequest<ClassSummary>(`/api/v1/classes/${id}`, {}, getAccessToken)),
+    updateClass: async (id: string, body: ClassUpdate) => normalizeClass(await apiRequest<ClassSummary>(`/api/v1/classes/${id}`, { method: "PATCH", body: JSON.stringify(body) }, getAccessToken)),
+    archiveClass: async (id: string) => normalizeClass(await apiRequest<ClassSummary>(`/api/v1/classes/${id}/archive`, { method: "POST" }, getAccessToken)),
+    unarchiveClass: async (id: string) => normalizeClass(await apiRequest<ClassSummary>(`/api/v1/classes/${id}/unarchive`, { method: "POST" }, getAccessToken)),
+    regenerateJoinCode: async (id: string) => normalizeJoinCode(await apiRequest<{ join_code?: string }>(`/api/v1/classes/${id}/join-code/regenerate`, { method: "POST" }, getAccessToken)),
+    removeMember: (id: string, studentId: string) => apiRequest<void>(`/api/v1/classes/${id}/members/${studentId}`, { method: "DELETE" }, getAccessToken),
+    deleteAccount: () => apiRequest<void>("/api/v1/me", { method: "DELETE" }, getAccessToken),
+    audit: async () => {
+      const raw = await apiRequest<AuditEntry[] | { items?: AuditEntry[] }>("/api/v1/me/audit", {}, getAccessToken);
+      return ensureArray(Array.isArray(raw) ? raw : raw?.items).map(normalizeAuditEntry);
+    },
     members: async (id: string) => ensureCollectionShape(await apiRequest<Collection<Member>>(`/api/v1/classes/${id}/members`, {}, getAccessToken)),
     assignments: async (id: string) => ensureCollectionShape(await apiRequest<Collection<Assignment>>(`/api/v1/classes/${id}/assignments`, {}, getAccessToken)),
     createAssignment: (classId: string, body: AssignmentInput) => apiRequest<Assignment>(`/api/v1/classes/${classId}/assignments`, { method: "POST", body: JSON.stringify(body) }, getAccessToken),

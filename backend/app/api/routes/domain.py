@@ -9,7 +9,7 @@ from app.api.dependencies.auth import get_authenticated_profile, get_student, ge
 from app.api.dependencies.rate_limit import rate_limit
 from app.core.errors import ApiError
 from app.db.session import get_db
-from app.models.models import Assignment, AssignmentStatus, Class, ClassMember, InterestProfile, Profile
+from app.models.models import Assignment, AssignmentStatus, Class, ClassMember, GeneratedAssignment, InterestProfile, Profile
 from app.schemas.domain import (
     AssignmentCreate,
     AssignmentListResponse,
@@ -20,6 +20,8 @@ from app.schemas.domain import (
     ClassMemberListResponse,
     ClassMembershipResponse,
     ClassResponse,
+    ClassUpdate,
+    GenerationStatusResponse,
     InterestProfileResponse,
     InterestsRequest,
     JoinClassRequest,
@@ -46,6 +48,7 @@ def class_base(item: Class) -> dict:
         "grade_level": item.grade_level,
         "description": item.description,
         "join_code": item.join_code,
+        "archived_at": item.archived_at,
         "created_at": item.created_at,
     }
 
@@ -68,14 +71,16 @@ def create_class(data: ClassCreate, db: Annotated[Session, Depends(get_db)], tea
 
 
 @router.get("/classes", response_model=ClassListResponse)
-def list_classes(db: Annotated[Session, Depends(get_db)], profile: Annotated[Profile, Depends(get_authenticated_profile)], limit: int = DEFAULT_PAGE_SIZE, offset: int = 0):
+def list_classes(db: Annotated[Session, Depends(get_db)], profile: Annotated[Profile, Depends(get_authenticated_profile)], limit: int = DEFAULT_PAGE_SIZE, offset: int = 0, include_archived: bool = False):
     limit, offset = _page(limit, offset)
+    # Archived classes are hidden from the default list (both roles); opt in explicitly.
+    archived_filter = [] if include_archived else [Class.archived_at.is_(None)]
     if profile.role.value == "teacher":
-        count_stmt = select(func.count()).select_from(Class).where(Class.teacher_id == profile.id)
-        page_stmt = select(Class).where(Class.teacher_id == profile.id).order_by(Class.created_at.desc())
+        count_stmt = select(func.count()).select_from(Class).where(Class.teacher_id == profile.id, *archived_filter)
+        page_stmt = select(Class).where(Class.teacher_id == profile.id, *archived_filter).order_by(Class.created_at.desc())
     else:
-        count_stmt = select(func.count()).select_from(Class).join(ClassMember).where(ClassMember.student_id == profile.id)
-        page_stmt = select(Class).join(ClassMember).where(ClassMember.student_id == profile.id).order_by(Class.created_at.desc())
+        count_stmt = select(func.count()).select_from(Class).join(ClassMember).where(ClassMember.student_id == profile.id, *archived_filter)
+        page_stmt = select(Class).join(ClassMember).where(ClassMember.student_id == profile.id, *archived_filter).order_by(Class.created_at.desc())
     total = db.scalar(count_stmt) or 0
     items = db.scalars(page_stmt.limit(limit).offset(offset)).all()
     # M6: resolve member/assignment counts for the whole page in two grouped queries
@@ -98,6 +103,32 @@ def delete_class(class_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], t
         raise ApiError(409, "CLASS_HAS_ASSIGNMENTS", "Classes with assignments cannot be deleted.")
     db.delete(item)
     db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.patch("/classes/{class_id}", response_model=ClassResponse)
+def update_class(class_id: uuid.UUID, data: ClassUpdate, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    return class_data(db, service.update_class(db, class_id, teacher, data))
+
+
+@router.post("/classes/{class_id}/archive", response_model=ClassResponse)
+def archive_class(class_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    return class_data(db, service.archive_class(db, class_id, teacher))
+
+
+@router.post("/classes/{class_id}/unarchive", response_model=ClassResponse)
+def unarchive_class(class_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    return class_data(db, service.unarchive_class(db, class_id, teacher))
+
+
+@router.post("/classes/{class_id}/join-code/regenerate", response_model=ClassResponse)
+def regenerate_join_code(class_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]):
+    return class_data(db, service.regenerate_join_code(db, class_id, teacher))
+
+
+@router.delete("/classes/{class_id}/members/{student_id}", status_code=status.HTTP_204_NO_CONTENT)
+def remove_member(class_id: uuid.UUID, student_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], teacher: Annotated[Profile, Depends(get_teacher)]) -> Response:
+    service.remove_member(db, class_id, student_id, teacher)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -137,6 +168,23 @@ def list_assignments(class_id: uuid.UUID, db: Annotated[Session, Depends(get_db)
 @router.get("/assignments/{assignment_id}", response_model=AssignmentResponse)
 def get_assignment(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], profile: Annotated[Profile, Depends(get_authenticated_profile)]):
     return assignment_data(service.get_assignment(db, assignment_id, profile))
+
+
+@router.get("/assignments/{assignment_id}/generation-status", response_model=GenerationStatusResponse)
+def generation_status(assignment_id: uuid.UUID, db: Annotated[Session, Depends(get_db)], student: Annotated[Profile, Depends(get_student)]):
+    # get_assignment applies the student visibility rule (member + published, else 404),
+    # matching "member of the assignment's class; 404 otherwise".
+    assignment = service.get_assignment(db, assignment_id, student)
+    interests = db.scalar(select(InterestProfile).where(InterestProfile.student_id == student.id))
+    if interests is None:
+        return {"status": "none"}
+    generated = db.scalar(select(GeneratedAssignment).where(
+        GeneratedAssignment.assignment_id == assignment.id,
+        GeneratedAssignment.assignment_content_version == assignment.content_version,
+        GeneratedAssignment.student_id == student.id,
+        GeneratedAssignment.interest_profile_version == interests.version,
+    ))
+    return {"status": generated.status.value if generated is not None else "none"}
 
 
 @router.patch("/assignments/{assignment_id}", response_model=AssignmentResponse)
