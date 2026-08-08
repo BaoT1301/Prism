@@ -2,7 +2,14 @@
 
 [Repository](https://github.com/BaoT1301/Prism) · AI-powered personalized learning for a classroom demo.
 
-Prism lets a teacher set one learning objective, then gives each student a safe, interest-aware version of the same interactive learning experience. The current vertical slice teaches Newton's Second Law through a schema-driven physics sandbox: students change mass and acceleration, observe deterministic force calculations, request progressive hints, reflect, and submit. Teachers can create classes, publish assignments, and review submission status.
+Prism lets a teacher set one learning objective, then gives each student a safe, interest-aware version of the same interactive learning experience. Students explore a schema-driven physics sandbox — change variables, watch a live relationship graph, compare runs, request progressive hints, reflect, and submit — across five deterministic formulas (Newton's second law, kinetic energy, momentum, Ohm's law, and work). Teachers create classes, publish assignments, and get a real teaching loop: per-assignment analytics, submission review with grades and feedback, and class/account management.
+
+### Feature highlights
+
+- **Interactive playground** — five physics formulas, each with a themed animated scene, a live output-vs-variable relationship graph, and run comparison. A fixture-backed version runs with no sign-in at [`/sandbox-demo.html`](sandbox-demo.html).
+- **Teacher analytics** — completion funnel, completion rate, hint usage, median time-to-submit, and a per-reflection answer breakdown for each assignment.
+- **Grading & feedback** — review a student's responses and reflections, leave a score (0–100, optional) and feedback; the student sees it in their feedback view.
+- **Class & account management** — rename/archive classes, regenerate join codes, remove students, and delete-your-account (soft-delete + anonymize) for data erasure. Teacher actions are recorded to an audit log.
 
 ## What judges can test
 
@@ -17,7 +24,7 @@ The public fixture-backed sandbox demo is also available at [`/sandbox-demo.html
 
 ## Architecture and safety
 
-- **Frontend:** React 19, TypeScript, Vite, Three.js for bounded renderer-owned visual scenes.
+- **Frontend:** React 19, TypeScript, Vite. Visual scenes and the relationship graph are bounded, hand-built inline SVG (no external chart or 3D library).
 - **Backend:** Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic.
 - **Data and auth:** PostgreSQL/Supabase and Clerk JWT verification via JWKS.
 - **AI:** OpenAI Responses API with strict structured output, schema validation, caching, and a deterministic fixture fallback.
@@ -101,11 +108,14 @@ For a rehearsed demo without OpenAI availability, set `DEMO_MODE=true`. The app 
 ## Tests and quality checks
 
 ```powershell
-.\.venv\Scripts\ruff check backend
-.\.venv\Scripts\pytest backend/tests
-npm test
-npm run build
+.\.venv\Scripts\ruff check backend    # lint
+.\.venv\Scripts\pytest backend/tests  # backend unit/integration tests
+npm test                              # frontend unit + component tests (vitest)
+npm run build                         # typecheck + production build (both entries)
+npm run test:e2e                      # Playwright end-to-end against /sandbox-demo.html
 ```
+
+`npm run test:e2e` boots Vite itself and drives the no-auth sandbox demo in a real browser (install the browser once with `npx playwright install chromium`). The authenticated teacher/student flows are covered by backend tests and frontend component tests; wiring Clerk test tokens into the E2E suite is a documented follow-up.
 
 ## Deployment
 
