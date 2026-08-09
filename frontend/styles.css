@@ -517,10 +517,13 @@ input:disabled { border-style: dashed; color: var(--muted); background: rgba(23,
 .assignment-skeleton .skeleton-card { min-height: 5rem; }
 @keyframes skeleton-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
 
+/* Ambient brand motion (floating cards, orbits, marquee, scene loops) is a
+   deliberate part of Prism's identity and is intentionally kept playing even
+   when a viewer requests reduced motion. Only smooth-scrolling — a common
+   vestibular trigger — is disabled here. Note: this overrides the usual
+   accessibility default, so viewers who set reduced-motion still see animation. */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-  .skeleton-card { animation: none; }
 }
 
 /* Teacher analytics — hand-built funnel + choice bars, editorial figures */

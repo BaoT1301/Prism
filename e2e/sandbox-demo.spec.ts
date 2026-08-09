@@ -47,6 +47,11 @@ async function driveToCompletion(page: Page, sliders: [string, string]) {
 test.describe("sandbox demo — no-auth interactive flow", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto(DEMO_URL);
+    // The app intentionally keeps ambient animation even under reduced-motion, so
+    // freeze animation/transition here for deterministic, non-flaky interactions.
+    await page.addStyleTag({
+      content: "*, *::before, *::after { animation-duration: 0s !important; animation-delay: 0s !important; transition-duration: 0s !important; transition-delay: 0s !important; }",
+    });
     await expect(page.getByTestId("sandbox-app")).toBeVisible();
     // The error boundary must never be the thing that renders.
     await expect(page.getByTestId("error-boundary")).toHaveCount(0);
