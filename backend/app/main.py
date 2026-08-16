@@ -2,6 +2,7 @@ import logging
 import re
 import time
 import uuid
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -11,6 +12,7 @@ from sqlalchemy import text
 from app.api.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import error_response, http_exception_handler
+from app.db.keep_alive import start_database_keep_alive, stop_database_keep_alive
 from app.db.session import get_engine
 
 error_logger = logging.getLogger("app.error")
@@ -46,7 +48,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         settings.demo_mode,
         bool(settings.openai_api_key),
     )
-    app = FastAPI(title="Prism API", version="0.1.0", description="API for the personalized learning platform.")
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        # Self-scheduling DB heartbeat: the always-on web process keeps the free-tier
+        # database from auto-pausing itself, with no external scheduler to set up or to
+        # silently disable. Production-only and best-effort (see app.db.keep_alive).
+        start_database_keep_alive(settings)
+        try:
+            yield
+        finally:
+            stop_database_keep_alive()
+
+    app = FastAPI(title="Prism API", version="0.1.0", description="API for the personalized learning platform.", lifespan=lifespan)
     allowed_origins = [settings.frontend_url]
     if settings.environment in {"development", "test"}:
         allowed_origins.extend(origin for origin in ("http://localhost:5173", "http://127.0.0.1:5173") if origin not in allowed_origins)
